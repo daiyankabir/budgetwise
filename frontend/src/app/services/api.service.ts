@@ -82,6 +82,8 @@ export class ApiService {
     start_date?: string;
     end_date?: string;
     search?: string;
+    sort_by?: 'date' | 'type' | 'amount';
+    sort_order?: 'asc' | 'desc';
   }) {
     return this.get<{
       transactions: Array<{

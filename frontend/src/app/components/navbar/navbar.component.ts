@@ -30,6 +30,15 @@ import { AuthService } from '../../services/auth.service';
         </a>
       </nav>
 
+      <button
+        mat-icon-button
+        class="mobile-nav-toggle"
+        [matMenuTriggerFor]="mobileNavigation"
+        *ngIf="authService.isAuthenticated()"
+        aria-label="Open navigation menu">
+        <mat-icon>menu</mat-icon>
+      </button>
+
       <div class="navbar-actions">
         <button mat-icon-button [matMenuTriggerFor]="userMenu" *ngIf="authService.isAuthenticated()" aria-label="User menu">
           <mat-icon>account_circle</mat-icon>
@@ -51,9 +60,32 @@ import { AuthService } from '../../services/auth.service';
           <span>Logout</span>
         </button>
       </mat-menu>
+
+      <mat-menu #mobileNavigation="matMenu">
+        <button mat-menu-item routerLink="/dashboard">
+          <mat-icon>dashboard</mat-icon>
+          <span>Dashboard</span>
+        </button>
+        <button mat-menu-item routerLink="/transactions">
+          <mat-icon>receipt_long</mat-icon>
+          <span>Transactions</span>
+        </button>
+        <button mat-menu-item routerLink="/budgets">
+          <mat-icon>account_balance</mat-icon>
+          <span>Budgets</span>
+        </button>
+        <button mat-menu-item routerLink="/reports">
+          <mat-icon>analytics</mat-icon>
+          <span>Reports</span>
+        </button>
+      </mat-menu>
     </mat-toolbar>
   `,
   styles: [`
+    .mobile-nav-toggle {
+      display: none;
+    }
+
     .navbar {
       background: white;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -141,6 +173,10 @@ import { AuthService } from '../../services/auth.service';
 
       .navbar-nav {
         display: none;
+      }
+
+      .mobile-nav-toggle {
+        display: inline-flex;
       }
 
       .navbar-brand span {

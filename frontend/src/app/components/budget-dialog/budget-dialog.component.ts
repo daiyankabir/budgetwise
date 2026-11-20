@@ -57,7 +57,7 @@ interface BudgetDialogData {
   `,
   styles: [`
     .full-width { width: 100%; }
-    .modal { min-width: 400px; }
+    .modal { width: 100%; min-width: 0; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
     .modal-title { font-size: 1.25rem; font-weight: 600; color: #1e293b; margin: 0; }
     .modal-close { background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background 0.2s ease, color 0.2s ease; }

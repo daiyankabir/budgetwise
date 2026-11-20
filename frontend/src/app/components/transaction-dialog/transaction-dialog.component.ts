@@ -87,7 +87,8 @@ interface DialogData {
     }
 
     .modal {
-      min-width: 400px;
+      width: 100%;
+      min-width: 0;
     }
 
     .modal-header {

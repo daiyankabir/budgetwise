@@ -3,6 +3,7 @@ import { Chart, ChartOptions, registerables } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { ApiService } from '../../services/api.service';
 import { Transaction, SpendingByCategory, MonthlyTrend } from '../../models/models';
+import { formatMonth } from '../../utils/month.util';
 
 Chart.register(...registerables);
 
@@ -72,7 +73,7 @@ Chart.register(...registerables);
         </div>
 
         <!-- Charts Row -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <div class="charts-grid">
           <!-- Spending by Category - Doughnut Chart -->
           <div class="chart-container">
             <h3 class="chart-title">Spending by Category</h3>
@@ -178,9 +179,20 @@ Chart.register(...registerables);
       white-space: nowrap;
     }
 
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .charts-grid > * {
+      min-width: 0;
+    }
+
     @media (max-width: 900px) {
-      .charts-row {
-        grid-template-columns: 1fr;
+      .charts-grid {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   `],
@@ -239,7 +251,7 @@ export class DashboardComponent implements OnInit {
   }
 
   getCurrentMonth(): string {
-    return new Date().toISOString().slice(0, 7);
+    return formatMonth(new Date());
   }
 
   generateMonths(): { value: string; label: string }[] {
@@ -247,7 +259,7 @@ export class DashboardComponent implements OnInit {
     const now = new Date();
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const value = d.toISOString().slice(0, 7);
+      const value = formatMonth(d);
       const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       months.push({ value, label });
     }

@@ -43,7 +43,7 @@ import { TransactionDialogComponent } from '../../components/transaction-dialog/
           <label class="filter-label">Category</label>
           <select class="filter-select" [formControl]="categoryControl">
             <option value="">All Categories</option>
-            <option *ngFor="let cat of expenseCategories()" [value]="cat.id">{{ cat.name }}</option>
+            <option *ngFor="let cat of categories()" [value]="cat.id">{{ cat.name }}</option>
           </select>
         </div>
         <div class="filter-group">
@@ -73,7 +73,7 @@ import { TransactionDialogComponent } from '../../components/transaction-dialog/
         </div>
 
         <div *ngIf="!loading() && transactions().length > 0" class="table-responsive">
-          <table mat-table [dataSource]="transactions()" matSort (matSortChange)="onSortChange($event)">
+          <table mat-table [dataSource]="transactions()" matSort [matSortActive]="sortBy()" [matSortDirection]="sortDirection()" (matSortChange)="onSortChange($event)">
             <!-- Date Column -->
             <ng-container matColumnDef="date">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
@@ -204,7 +204,9 @@ export class TransactionsComponent implements OnInit {
   totalPages = signal(1);
   totalItems = signal(0);
 
-  expenseCategories = signal<Category[]>([]);
+  categories = signal<Category[]>([]);
+  sortBy = signal<'date' | 'type' | 'amount'>('date');
+  sortDirection = signal<'asc' | 'desc'>('desc');
 
   searchControl = new FormControl('');
   typeControl = new FormControl<'income' | 'expense' | ''>('');
@@ -221,7 +223,7 @@ export class TransactionsComponent implements OnInit {
   loadCategories() {
     this.api.getCategories().subscribe({
       next: (res) => {
-        this.expenseCategories.set(res.categories.filter(c => c.type === 'expense'));
+        this.categories.set(res.categories);
       },
     });
   }
@@ -259,6 +261,8 @@ export class TransactionsComponent implements OnInit {
       category_id: this.categoryControl.value || undefined,
       start_date: this.startDateControl.value || undefined,
       end_date: this.endDateControl.value || undefined,
+      sort_by: this.sortBy(),
+      sort_order: this.sortDirection(),
     };
 
     this.api.getTransactions(params).subscribe({
@@ -276,7 +280,22 @@ export class TransactionsComponent implements OnInit {
   }
 
   onSortChange(sort: Sort) {
-    // Backend doesn't support sorting yet, reload with current filters
+    if (!sort.direction) {
+      this.sortBy.set('date');
+      this.sortDirection.set('desc');
+    } else {
+      switch (sort.active) {
+        case 'date':
+        case 'type':
+        case 'amount':
+          this.sortBy.set(sort.active);
+          this.sortDirection.set(sort.direction);
+          break;
+        default:
+          return;
+      }
+    }
+    this.currentPage.set(1);
     this.loadTransactions();
   }
 

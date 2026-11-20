@@ -27,6 +27,8 @@ const querySchema = z.object({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   search: z.string().optional(),
+  sort_by: z.enum(['date', 'type', 'amount']).default('date'),
+  sort_order: z.enum(['asc', 'desc']).default('desc'),
 });
 
 interface TransactionRow {
@@ -60,7 +62,7 @@ interface InsertTransaction {
 
 router.get('/', (req: AuthRequest, res: Response) => {
   try {
-    const { page, limit, type, category_id, start_date, end_date, search } = querySchema.parse(req.query);
+    const { page, limit, type, category_id, start_date, end_date, search, sort_by, sort_order } = querySchema.parse(req.query);
 
     const db = getDatabase();
 
@@ -88,10 +90,16 @@ router.get('/', (req: AuthRequest, res: Response) => {
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM transactions t ${whereClause}`);
+    const countStmt = db.prepare(`
+      SELECT COUNT(*) as total
+      FROM transactions t
+      JOIN categories c ON t.category_id = c.id
+      ${whereClause}
+    `);
     const { total } = countStmt.get(...params) as { total: number };
 
     const offset = (page - 1) * limit;
+    const sortColumn = { date: 't.date', type: 't.type', amount: 't.amount' }[sort_by];
 
     const transactions = db
       .prepare(
@@ -100,7 +108,7 @@ router.get('/', (req: AuthRequest, res: Response) => {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
       ${whereClause}
-      ORDER BY t.date DESC, t.created_at DESC
+      ORDER BY ${sortColumn} ${sort_order.toUpperCase()}, t.date DESC, t.created_at DESC
       LIMIT ? OFFSET ?
     `
       )

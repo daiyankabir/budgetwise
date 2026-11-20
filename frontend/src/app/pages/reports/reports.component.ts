@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { Chart, ChartOptions, registerables } from 'chart.js';
 import { ApiService } from '../../services/api.service';
 import { SpendingByCategory, MonthlyTrend, TopCategory } from '../../models/models';
+import { formatMonth } from '../../utils/month.util';
 
 Chart.register(...registerables);
 
@@ -73,7 +74,7 @@ Chart.register(...registerables);
         </div>
 
         <!-- Charts Row 1 -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <div class="charts-grid">
           <!-- Income vs Expense - Horizontal Bar -->
           <div class="chart-container">
             <h3 class="chart-title">Income vs Expenses</h3>
@@ -105,7 +106,7 @@ Chart.register(...registerables);
         </div>
 
         <!-- Charts Row 2 -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+        <div class="charts-grid">
           <!-- Monthly Trend -->
           <div class="chart-container">
             <h3 class="chart-title">Monthly Trend (6 Months)</h3>
@@ -197,6 +198,17 @@ Chart.register(...registerables);
       animation: fadeIn 0.3s ease;
     }
 
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .charts-grid > * {
+      min-width: 0;
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -217,8 +229,8 @@ Chart.register(...registerables);
     }
 
     @media (max-width: 900px) {
-      .charts-row {
-        grid-template-columns: 1fr;
+      .charts-grid {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   `],
@@ -251,7 +263,7 @@ export class ReportsComponent implements OnInit {
   }
 
   getCurrentMonth(): string {
-    return new Date().toISOString().slice(0, 7);
+    return formatMonth(new Date());
   }
 
   generateMonths(): { value: string; label: string }[] {
@@ -259,7 +271,7 @@ export class ReportsComponent implements OnInit {
     const now = new Date();
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const value = d.toISOString().slice(0, 7);
+      const value = formatMonth(d);
       const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       months.push({ value, label });
     }

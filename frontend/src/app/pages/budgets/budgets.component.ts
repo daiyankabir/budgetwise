@@ -5,6 +5,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../services/api.service';
 import { Budget, BudgetOverviewItem, Category } from '../../models/models';
 import { BudgetDialogComponent } from '../../components/budget-dialog/budget-dialog.component';
+import { formatMonth } from '../../utils/month.util';
 
 @Component({
   selector: 'app-budgets',
@@ -239,7 +240,7 @@ export class BudgetsComponent implements OnInit {
   }
 
   getCurrentMonth(): string {
-    return new Date().toISOString().slice(0, 7);
+    return formatMonth(new Date());
   }
 
   generateMonths(): { value: string; label: string }[] {
@@ -247,7 +248,7 @@ export class BudgetsComponent implements OnInit {
     const now = new Date();
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const value = d.toISOString().slice(0, 7);
+      const value = formatMonth(d);
       const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       months.push({ value, label });
     }
