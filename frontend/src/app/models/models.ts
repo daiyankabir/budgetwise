@@ -45,6 +45,13 @@ export interface Budget {
   isOverBudget?: boolean;
 }
 
+export interface BudgetOverviewItem extends Budget {
+  spent: number;
+  remaining: number;
+  percentage: number;
+  isOverBudget: boolean;
+}
+
 export interface DashboardSummary {
   income: number;
   expenses: number;
@@ -118,7 +125,7 @@ export interface ImportResult {
 }
 
 export interface BudgetOverview {
-  overview: Budget[];
+  overview: BudgetOverviewItem[];
   summary: {
     totalBudget: number;
     totalSpent: number;

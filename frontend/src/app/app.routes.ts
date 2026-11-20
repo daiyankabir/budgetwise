@@ -1,5 +1,11 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './guards/auth.guard';
+import { AuthGuard } from './guards/auth.guard';
+import { LoginComponent } from './pages/login/login.component';
+import { RegisterComponent } from './pages/register/register.component';
+import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { TransactionsComponent } from './pages/transactions/transactions.component';
+import { BudgetsComponent } from './pages/budgets/budgets.component';
+import { ReportsComponent } from './pages/reports/reports.component';
 
 export const appRoutes: Routes = [
   {
@@ -9,31 +15,31 @@ export const appRoutes: Routes = [
   },
   {
     path: 'login',
-    loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent),
+    component: LoginComponent,
   },
   {
     path: 'register',
-    loadComponent: () => import('./pages/register/register.component').then((m) => m.RegisterComponent),
+    component: RegisterComponent,
   },
   {
     path: 'dashboard',
-    loadComponent: () => import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-    canActivate: [authGuard],
+    component: DashboardComponent,
+    canActivate: [AuthGuard],
   },
   {
     path: 'transactions',
-    loadComponent: () => import('./pages/transactions/transactions.component').then((m) => m.TransactionsComponent),
-    canActivate: [authGuard],
+    component: TransactionsComponent,
+    canActivate: [AuthGuard],
   },
   {
     path: 'budgets',
-    loadComponent: () => import('./pages/budgets/budgets.component').then((m) => m.BudgetsComponent),
-    canActivate: [authGuard],
+    component: BudgetsComponent,
+    canActivate: [AuthGuard],
   },
   {
     path: 'reports',
-    loadComponent: () => import('./pages/reports/reports.component').then((m) => m.ReportsComponent),
-    canActivate: [authGuard],
+    component: ReportsComponent,
+    canActivate: [AuthGuard],
   },
   {
     path: '**',

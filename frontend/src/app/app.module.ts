@@ -23,6 +23,7 @@ import { MatSortModule } from '@angular/material/sort';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { NgChartsModule } from 'ng2-charts';
 
 import { AppComponent } from './app.component';
 import { NavbarComponent } from './components/navbar/navbar.component';
@@ -79,6 +80,7 @@ import { AuthGuard } from './guards/auth.guard';
     MatDatepickerModule,
     MatNativeDateModule,
     MatTooltipModule,
+    NgChartsModule,
   ],
   providers: [
     AuthService,

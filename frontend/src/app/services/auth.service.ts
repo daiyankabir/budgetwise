@@ -1,5 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
+import { finalize, tap } from 'rxjs';
 import { ApiService } from './api.service';
 import { User, AuthResponse } from '../models/models';
 
@@ -49,34 +50,28 @@ export class AuthService {
 
   register(email: string, password: string) {
     this._loading.set(true);
-    return this.api.post<AuthResponse>('/auth/register', { email, password }).subscribe({
-      next: (res) => {
+    return this.api.post<AuthResponse>('/auth/register', { email, password }).pipe(
+      tap((res) => {
         this._token.set(res.token);
         this._user.set(res.user);
         this.saveToStorage(res.token, res.user);
-        this._loading.set(false);
         this.router.navigate(['/dashboard']);
-      },
-      error: () => {
-        this._loading.set(false);
-      },
-    });
+      }),
+      finalize(() => this._loading.set(false)),
+    );
   }
 
   login(email: string, password: string) {
     this._loading.set(true);
-    return this.api.post<AuthResponse>('/auth/login', { email, password }).subscribe({
-      next: (res) => {
+    return this.api.post<AuthResponse>('/auth/login', { email, password }).pipe(
+      tap((res) => {
         this._token.set(res.token);
         this._user.set(res.user);
         this.saveToStorage(res.token, res.user);
-        this._loading.set(false);
         this.router.navigate(['/dashboard']);
-      },
-      error: () => {
-        this._loading.set(false);
-      },
-    });
+      }),
+      finalize(() => this._loading.set(false)),
+    );
   }
 
   logout() {

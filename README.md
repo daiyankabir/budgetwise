@@ -32,8 +32,8 @@ cd budgetwise
 docker-compose up --build
 ```
 
-- **Frontend:** http://localhost:4200
-- **Backend API:** http://localhost:3000
+- **Frontend:** http://localhost:4201
+- **Backend API:** http://localhost:3001
 
 ### Local Development
 

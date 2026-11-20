@@ -1,19 +1,9 @@
 import { Component, inject, OnInit, signal, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { MatSortModule, Sort } from '@angular/material/sort';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { FormControl } from '@angular/forms';
+import { PageEvent } from '@angular/material/paginator';
+import { Sort } from '@angular/material/sort';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { startWith, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { merge, Observable } from 'rxjs';
 import { ApiService } from '../../services/api.service';
@@ -22,24 +12,6 @@ import { TransactionDialogComponent } from '../../components/transaction-dialog/
 
 @Component({
   selector: 'app-transactions',
-  standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    MatTableModule,
-    MatPaginatorModule,
-    MatSortModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-    MatDialogModule,
-    MatMenuModule,
-    MatTooltipModule,
-    MatSnackBarModule,
-  ],
   template: `
     <div class="main-content">
       <div class="page-header">

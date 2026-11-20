@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Chart, registerables } from 'chart.js';
+import { Chart, ChartOptions, registerables } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { ApiService } from '../../services/api.service';
 import { Transaction, SpendingByCategory, MonthlyTrend } from '../../models/models';
@@ -284,7 +284,7 @@ export class DashboardComponent implements OnInit {
     };
   }
 
-  doughnutChartOptions = {
+  doughnutChartOptions: ChartOptions<'doughnut'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -338,7 +338,7 @@ export class DashboardComponent implements OnInit {
     };
   }
 
-  barChartOptions = {
+  barChartOptions: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -369,7 +369,7 @@ export class DashboardComponent implements OnInit {
         grid: { color: '#e2e8f0' },
         ticks: {
           font: { size: 11, family: 'Inter' },
-          callback: (value: number) => this.formatCurrency(value).replace(/\.00$/, ''),
+          callback: (value: string | number) => this.formatCurrency(Number(value)).replace(/\.00$/, ''),
         },
       },
     },

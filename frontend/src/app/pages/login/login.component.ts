@@ -20,7 +20,7 @@ import { AuthService } from '../../services/auth.service';
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
           <div class="form-field">
             <label class="form-label">Email</label>
-            <mat-form-field appearance="outline" class="full-width">
+            <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
               <input matInput type="email" formControlName="email" placeholder="you@example.com" required autocomplete="email">
               <mat-icon matPrefix>email</mat-icon>
               <mat-error *ngIf="form.get('email')?.hasError('required')">Email is required</mat-error>
@@ -30,7 +30,7 @@ import { AuthService } from '../../services/auth.service';
 
           <div class="form-field">
             <label class="form-label">Password</label>
-            <mat-form-field appearance="outline" class="full-width">
+            <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
               <input matInput [type]="hidePassword ? 'password' : 'text'" formControlName="password" placeholder="••••••••" required autocomplete="current-password">
               <mat-icon matPrefix>lock</mat-icon>
               <button mat-icon-button matSuffix type="button" (click)="hidePassword = !hidePassword" [attr.aria-label]="hidePassword ? 'Show password' : 'Hide password'">
@@ -67,8 +67,12 @@ import { AuthService } from '../../services/auth.service';
       margin-right: 8px;
     }
 
+    .auth-form {
+      gap: 12px;
+    }
+
     .form-field {
-      margin-bottom: 20px;
+      margin-bottom: 0;
     }
 
     .form-label {

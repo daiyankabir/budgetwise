@@ -10,6 +10,6 @@
     "strictInputAccessModifiers": true,
     "strictTemplates": true
   },
-  "files": ["src/main.ts", "src/global.d.ts"],
+  "files": ["src/main.ts"],
   "include": ["src/**/*.d.ts"]
 }

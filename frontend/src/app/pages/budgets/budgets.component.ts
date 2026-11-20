@@ -1,37 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { MatInputModule } from '@angular/material/input';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
+import { FormControl } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../services/api.service';
-import { Budget, Category } from '../../models/models';
+import { Budget, BudgetOverviewItem, Category } from '../../models/models';
 import { BudgetDialogComponent } from '../../components/budget-dialog/budget-dialog.component';
 
 @Component({
   selector: 'app-budgets',
-  standalone: true,
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatSelectModule,
-    MatInputModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-    MatDialogModule,
-    MatMenuModule,
-    MatSnackBarModule,
-  ],
   template: `
     <div class="main-content">
       <div class="page-header">
@@ -239,6 +215,7 @@ import { BudgetDialogComponent } from '../../components/budget-dialog/budget-dia
   `],
 })
 export class BudgetsComponent implements OnInit {
+  readonly Math = Math;
   private api = inject(ApiService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
@@ -247,7 +224,7 @@ export class BudgetsComponent implements OnInit {
   selectedMonth = signal(this.getCurrentMonth());
   availableMonths = this.generateMonths();
 
-  budgets = signal<Budget[]>([]);
+  budgets = signal<BudgetOverviewItem[]>([]);
   budgetSummary = signal({ totalBudget: 0, totalSpent: 0, totalRemaining: 0, overallPercentage: 0 });
   expenseCategories = signal<Category[]>([]);
 

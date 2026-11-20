@@ -54,7 +54,7 @@ export class ApiService {
 
   // Categories
   getCategories() {
-    return this.get<{ categories: Array<{ id: number; name: string; type: string; color: string; icon: string; user_id?: number; is_default?: boolean }> }>('/categories');
+    return this.get<{ categories: Array<{ id: number; name: string; type: 'income' | 'expense'; color: string; icon: string; user_id?: number; is_default?: boolean }> }>('/categories');
   }
 
   getCategory(id: number) {

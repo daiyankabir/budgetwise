@@ -1,14 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatNativeDateModule } from '@angular/material/core';
-import { Chart, registerables } from 'chart.js';
-import { BaseChartDirective } from 'ng2-charts';
+import { Chart, ChartOptions, registerables } from 'chart.js';
 import { ApiService } from '../../services/api.service';
 import { SpendingByCategory, MonthlyTrend, TopCategory } from '../../models/models';
 
@@ -16,18 +7,6 @@ Chart.register(...registerables);
 
 @Component({
   selector: 'app-reports',
-  standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatSelectModule,
-    MatIconModule,
-    MatButtonModule,
-    MatProgressSpinnerModule,
-    MatNativeDateModule,
-    BaseChartDirective,
-  ],
   template: `
     <div class="main-content">
       <div class="page-header">
@@ -361,7 +340,7 @@ export class ReportsComponent implements OnInit {
     };
   }
 
-  horizontalBarChartOptions = {
+  horizontalBarChartOptions: ChartOptions<'bar'> = {
     indexAxis: 'y' as const,
     responsive: true,
     maintainAspectRatio: false,
@@ -381,7 +360,7 @@ export class ReportsComponent implements OnInit {
         grid: { color: '#e2e8f0' },
         ticks: {
           font: { size: 11, family: 'Inter' },
-          callback: (value: number) => this.formatCurrency(value).replace(/\.00$/, ''),
+          callback: (value: string | number) => this.formatCurrency(Number(value)).replace(/\.00$/, ''),
         },
       },
       y: {
@@ -426,7 +405,7 @@ export class ReportsComponent implements OnInit {
     };
   }
 
-  monthlyTrendChartOptions = {
+  monthlyTrendChartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -452,7 +431,7 @@ export class ReportsComponent implements OnInit {
         grid: { color: '#e2e8f0' },
         ticks: {
           font: { size: 11, family: 'Inter' },
-          callback: (value: number) => this.formatCurrency(value).replace(/\.00$/, ''),
+          callback: (value: string | number) => this.formatCurrency(Number(value)).replace(/\.00$/, ''),
         },
       },
     },
@@ -476,7 +455,7 @@ export class ReportsComponent implements OnInit {
     };
   }
 
-  doughnutChartOptions = {
+  doughnutChartOptions: ChartOptions<'doughnut'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
