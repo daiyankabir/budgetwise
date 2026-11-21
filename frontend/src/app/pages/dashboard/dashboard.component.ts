@@ -4,7 +4,7 @@ import { Chart, ChartOptions, registerables } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../services/api.service';
-import { CurrencyConversionRate, Transaction, SpendingByCategory, MonthlyTrend } from '../../models/models';
+import { CurrencyConversionRate, Transaction, SpendingByCategory, TrendPeriod, TrendPoint } from '../../models/models';
 import { formatMonth } from '../../utils/month.util';
 import { CurrencyService } from '../../services/currency.service';
 import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
@@ -104,15 +104,27 @@ Chart.register(...registerables);
             </div>
           </div>
 
-          <!-- Monthly Trend - Bar Chart -->
+          <!-- Transaction Trend - Bar Chart -->
           <div class="chart-container">
-            <h3 class="chart-title">6-Month Trend</h3>
-            <div *ngIf="trendData.length === 0" class="empty-state">
-              <mat-icon class="empty-icon">show_chart</mat-icon>
-              <h4 class="empty-title">No trend data</h4>
-              <p class="empty-message">Add transactions to see your monthly trends.</p>
+            <div class="trend-chart-header">
+              <h3 class="chart-title">Transaction trend</h3>
+              <mat-select
+                class="trend-period-select"
+                panelClass="trend-period-panel"
+                aria-label="Trend period"
+                [value]="trendPeriod"
+                (selectionChange)="onTrendPeriodChange($event.value)">
+                <mat-option *ngFor="let option of trendPeriods" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
             </div>
-            <div *ngIf="trendData.length > 0" style="height: 300px;">
+            <div *ngIf="!hasTrendTransactions" class="empty-state">
+              <mat-icon class="empty-icon">show_chart</mat-icon>
+              <h4 class="empty-title">No transactions in this period</h4>
+              <p class="empty-message">Try a longer range or add transactions in this period.</p>
+            </div>
+            <div *ngIf="hasTrendTransactions" style="height: 300px;">
               <canvas baseChart
                 [data]="barChartData"
                 [options]="barChartOptions"
@@ -208,6 +220,18 @@ Chart.register(...registerables);
       font-size: 0.8rem;
     }
 
+    .trend-chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .trend-chart-header .chart-title {
+      margin: 0;
+    }
+
     .charts-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -236,11 +260,18 @@ export class DashboardComponent implements OnInit {
   loading = true;
   selectedMonth = '';
   availableMonths: { value: string; label: string }[] = [];
+  trendPeriod: TrendPeriod = '30d';
+  trendPeriods: Array<{ value: TrendPeriod; label: string }> = [
+    { value: '7d', label: '1 week' },
+    { value: '15d', label: '15 days' },
+    { value: '30d', label: '30 days' },
+    { value: '3m', label: '3 months' },
+  ];
 
   summary = { income: 0, expenses: 0, balance: 0, savingsRate: 0 };
   recentTransactions: Transaction[] = [];
   spendingData: SpendingByCategory[] = [];
-  trendData: MonthlyTrend[] = [];
+  trendData: TrendPoint[] = [];
   conversionRates: CurrencyConversionRate[] = [];
   ratesUpdatedAt: string | null = null;
 
@@ -290,14 +321,27 @@ export class DashboardComponent implements OnInit {
       },
     });
 
-    this.api.getMonthlyTrend(6).subscribe({
+    this.loadTrend();
+  }
+
+  onTrendPeriodChange(period: TrendPeriod) {
+    this.trendPeriod = period;
+    this.loadTrend();
+  }
+
+  loadTrend() {
+    this.api.getTrend(this.trendPeriod).subscribe({
       next: (res) => {
         this.trendData = res.trend;
       },
       error: (error) => {
-        this.snackBar.open(error?.error?.error || 'Failed to load monthly trend', 'Close', { duration: 4000 });
+        this.snackBar.open(error?.error?.error || 'Failed to load transaction trend', 'Close', { duration: 4000 });
       },
     });
+  }
+
+  get hasTrendTransactions(): boolean {
+    return this.trendData.some((point) => point.income > 0 || point.expenses > 0);
   }
 
   getCurrentMonth(): string {
@@ -377,21 +421,23 @@ export class DashboardComponent implements OnInit {
   get barChartData() {
     const data = this.trendData;
     return {
-      labels: data.map(d => {
-        const [year, month] = d.month.split('-');
-        return new Date(+year, +month - 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      labels: data.map((point) => {
+        const date = new Date(`${point.period}T00:00:00`);
+        return this.trendPeriod === '3m'
+          ? date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+          : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       }),
       datasets: [
         {
           label: 'Income',
-          data: data.map(d => d.income),
+          data: data.map((point) => point.income),
           backgroundColor: this.themeService.palette().income,
           borderRadius: 6,
           maxBarThickness: 40,
         },
         {
           label: 'Expenses',
-          data: data.map(d => d.expenses),
+          data: data.map((point) => point.expenses),
           backgroundColor: this.themeService.palette().expense,
           borderRadius: 6,
           maxBarThickness: 40,

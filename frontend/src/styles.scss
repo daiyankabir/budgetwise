@@ -723,6 +723,30 @@ button[mat-icon-button].mat-mdc-icon-button {
   min-height: 36px !important;
 }
 
+.trend-period-select {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  flex: 0 0 112px;
+  width: 112px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.trend-period-select .mat-mdc-select-trigger {
+  height: 100%;
+}
+
+.trend-period-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .mat-mdc-option .mdc-list-item__primary-text {
   font-size: 0.875rem !important;
   line-height: 20px;

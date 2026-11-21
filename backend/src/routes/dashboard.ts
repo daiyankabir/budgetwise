@@ -20,6 +20,8 @@ const monthSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, 'Invalid month format (YYYY-MM)').optional(),
 });
 
+const trendPeriodSchema = z.enum(['7d', '15d', '30d', '3m']);
+
 interface AmountByCurrency {
   currency: CurrencyCode;
   total: number;
@@ -40,6 +42,19 @@ interface SpendingRow {
 
 interface TrendRow {
   month: string;
+  currency: CurrencyCode;
+  income: number;
+  expenses: number;
+}
+
+interface PeriodTrendRow {
+  period: string;
+  currency: CurrencyCode | null;
+  income: number;
+  expenses: number;
+}
+
+interface PeriodCurrencyAmounts {
   currency: CurrencyCode;
   income: number;
   expenses: number;
@@ -262,6 +277,92 @@ router.get('/monthly-trend', async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     handleError(error, res, 'Get monthly trend error');
+  }
+});
+
+router.get('/trend', async (req: AuthRequest, res: Response) => {
+  try {
+    const period = trendPeriodSchema.parse(req.query.period ?? '30d');
+    const isMonthly = period === '3m';
+    const startDateExpression = isMonthly
+      ? "date('now', 'start of month', '-2 months')"
+      : {
+          '7d': "date('now', '-6 days')",
+          '15d': "date('now', '-14 days')",
+          '30d': "date('now', '-29 days')",
+        }[period];
+    const periodExpression = isMonthly ? "strftime('%Y-%m-01', t.date)" : 'date(t.date)';
+    const nextPeriodExpression = isMonthly ? "date(value, '+1 month')" : "date(value, '+1 day')";
+    const currentPeriodExpression = isMonthly ? "date('now', 'start of month')" : "date('now')";
+    const db = getDatabase();
+    const displayCurrency = getUserDisplayCurrency(req.userId!);
+
+    const rows = db
+      .prepare(`
+        WITH RECURSIVE periods(value) AS (
+          SELECT ${startDateExpression}
+          UNION ALL
+          SELECT ${nextPeriodExpression} FROM periods WHERE value < ${currentPeriodExpression}
+        ),
+        grouped AS (
+          SELECT
+            ${periodExpression} as period,
+            t.currency,
+            SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,
+            SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END) as expenses
+          FROM transactions t
+          WHERE t.user_id = ? AND t.date >= ${startDateExpression} AND t.date <= date('now')
+          GROUP BY ${periodExpression}, t.currency
+        )
+        SELECT
+          periods.value as period,
+          grouped.currency,
+          COALESCE(grouped.income, 0) as income,
+          COALESCE(grouped.expenses, 0) as expenses
+        FROM periods
+        LEFT JOIN grouped ON grouped.period = periods.value
+        ORDER BY periods.value, grouped.currency
+      `)
+      .all(req.userId!) as PeriodTrendRow[];
+
+    const currencies = Array.from(new Set(rows.flatMap((row) => (row.currency ? [row.currency] : []))));
+    const { rates, updatedAt } = await getRates(currencies, displayCurrency);
+    const groupedPeriods = new Map<string, PeriodCurrencyAmounts[]>();
+    for (const row of rows) {
+      if (row.currency === null) {
+        continue;
+      }
+      const entries = groupedPeriods.get(row.period) ?? [];
+      entries.push({ currency: row.currency, income: row.income, expenses: row.expenses });
+      groupedPeriods.set(row.period, entries);
+    }
+
+    const periods = Array.from(new Set(rows.map((row) => row.period)));
+    const trend = periods.map((value) => {
+      const entries = groupedPeriods.get(value) ?? [];
+      return {
+        period: value,
+        income: convertGroupedAmounts(
+          entries.map((entry) => ({ currency: entry.currency, total: entry.income })),
+          displayCurrency,
+          rates,
+        ).total,
+        expenses: convertGroupedAmounts(
+          entries.map((entry) => ({ currency: entry.currency, total: entry.expenses })),
+          displayCurrency,
+          rates,
+        ).total,
+      };
+    });
+
+    res.json({
+      trend,
+      displayCurrency,
+      conversionRates: listConversionRates(currencies, displayCurrency, rates),
+      ratesUpdatedAt: updatedAt,
+    });
+  } catch (error) {
+    handleError(error, res, 'Get transaction trend error');
   }
 });
 

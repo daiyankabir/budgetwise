@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { CurrencyCode, CurrencySettings } from '../models/models';
+import { CurrencyCode, CurrencySettings, TrendPeriod, TrendPoint } from '../models/models';
 
 @Injectable({
   providedIn: 'root',
@@ -366,6 +366,15 @@ export class ApiService {
       conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
       ratesUpdatedAt: string | null;
     }>('/dashboard/monthly-trend', { months });
+  }
+
+  getTrend(period: TrendPeriod) {
+    return this.get<{
+      trend: TrendPoint[];
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
+    }>('/dashboard/trend', { period });
   }
 
   getIncomeVsExpense(month?: string) {

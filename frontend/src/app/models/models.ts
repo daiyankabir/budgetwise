@@ -100,6 +100,14 @@ export interface MonthlyTrend {
   expenses: number;
 }
 
+export type TrendPeriod = '7d' | '15d' | '30d' | '3m';
+
+export interface TrendPoint {
+  period: string;
+  income: number;
+  expenses: number;
+}
+
 export interface IncomeVsExpense {
   income: number;
   expenses: number;
