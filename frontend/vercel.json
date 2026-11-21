@@ -4,7 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://budgetwise-api.vercel.app/api/:path*"
+      "destination": "https://budgetwise-wine.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
