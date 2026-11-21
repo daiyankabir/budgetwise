@@ -88,7 +88,7 @@ async function getRates(currencies: CurrencyCode[], target: CurrencyCode) {
 
 function handleError(error: unknown, res: Response, context: string) {
   if (error instanceof z.ZodError) {
-    return res.status(400).json({ error: error.errors[0].message });
+    return res.status(400).json({ error: error.issues[0].message });
   }
   return respondCurrencyError(error, res, context);
 }
@@ -98,18 +98,18 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
     const { month } = monthSchema.parse(req.query);
     const targetMonth = month || new Date().toISOString().slice(0, 7);
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
-    const grouped = db
+    const grouped = await db
       .prepare(`
         SELECT type, currency, COALESCE(SUM(amount), 0) as total
         FROM transactions
-        WHERE user_id = ? AND date LIKE ?
+        WHERE user_id = ? AND date::text LIKE ?
         GROUP BY type, currency
       `)
       .all(req.userId!, `${targetMonth}%`) as Array<SummaryAmount>;
 
-    const recentTransactions = db
+    const recentTransactions = await db
       .prepare(`
         SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon, c.type as category_type
         FROM transactions t
@@ -165,17 +165,17 @@ router.get('/spending-by-category', async (req: AuthRequest, res: Response) => {
     const { month } = monthSchema.parse(req.query);
     const targetMonth = month || new Date().toISOString().slice(0, 7);
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
-    const rows = db
+    const rows = await db
       .prepare(`
         SELECT c.id, c.name, c.color, c.icon, t.currency, COALESCE(SUM(t.amount), 0) as total
         FROM categories c
         LEFT JOIN transactions t
-          ON c.id = t.category_id AND t.user_id = ? AND t.type = 'expense' AND t.date LIKE ?
+          ON c.id = t.category_id AND t.user_id = ? AND t.type = 'expense' AND t.date::text LIKE ?
         WHERE c.type = 'expense' AND (c.user_id = ? OR c.is_default = 1)
         GROUP BY c.id, c.name, c.color, c.icon, t.currency
-        HAVING total > 0
+        HAVING SUM(t.amount) > 0
         ORDER BY total DESC
       `)
       .all(req.userId!, `${targetMonth}%`, req.userId!) as SpendingRow[];
@@ -230,21 +230,21 @@ router.get('/monthly-trend', async (req: AuthRequest, res: Response) => {
     const monthsSchema = z.coerce.number().int().positive().max(120).default(6);
     const months = monthsSchema.parse(req.query.months ?? '6');
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
-    const rows = db
+    const rows = await db
       .prepare(`
         SELECT
-          strftime('%Y-%m', date) as month,
+          TO_CHAR(date, 'YYYY-MM') as month,
           currency,
           SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
           SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expenses
         FROM transactions
-        WHERE user_id = ? AND date >= date('now', ? || ' months')
-        GROUP BY strftime('%Y-%m', date), currency
+        WHERE user_id = ? AND date >= date_trunc('month', CURRENT_DATE) - ($2 * INTERVAL '1 month')
+        GROUP BY TO_CHAR(date, 'YYYY-MM'), currency
         ORDER BY month
       `)
-      .all(req.userId!, `-${months + 1}`) as TrendRow[];
+      .all(req.userId!, months + 1) as TrendRow[];
 
     const currencies = rows.map((row) => row.currency);
     const { rates, updatedAt } = await getRates(currencies, displayCurrency);
@@ -284,46 +284,49 @@ router.get('/trend', async (req: AuthRequest, res: Response) => {
   try {
     const period = trendPeriodSchema.parse(req.query.period ?? '30d');
     const isMonthly = period === '3m';
-    const startDateExpression = isMonthly
-      ? "date('now', 'start of month', '-2 months')"
-      : {
-          '7d': "date('now', '-6 days')",
-          '15d': "date('now', '-14 days')",
-          '30d': "date('now', '-29 days')",
-        }[period];
-    const periodExpression = isMonthly ? "strftime('%Y-%m-01', t.date)" : 'date(t.date)';
-    const nextPeriodExpression = isMonthly ? "date(value, '+1 month')" : "date(value, '+1 day')";
-    const currentPeriodExpression = isMonthly ? "date('now', 'start of month')" : "date('now')";
+    const today = new Date();
+    const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const startDate = new Date(todayUtc);
+    let periodEnd = todayUtc;
+    const step = isMonthly ? '1 month' : '1 day';
+    if (isMonthly) {
+      startDate.setUTCDate(1);
+      startDate.setUTCMonth(startDate.getUTCMonth() - 2);
+      periodEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    } else {
+      startDate.setUTCDate(startDate.getUTCDate() - (Number(period.slice(0, -1)) - 1));
+    }
+    const startDateText = startDate.toISOString().slice(0, 10);
+    const periodEndText = periodEnd.toISOString().slice(0, 10);
+    const todayText = todayUtc.toISOString().slice(0, 10);
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
-    const rows = db
+    const rows = await db
       .prepare(`
-        WITH RECURSIVE periods(value) AS (
-          SELECT ${startDateExpression}
-          UNION ALL
-          SELECT ${nextPeriodExpression} FROM periods WHERE value < ${currentPeriodExpression}
+        WITH periods AS (
+          SELECT generate_series($2::date, $3::date, $4::interval)::date AS period
         ),
         grouped AS (
           SELECT
-            ${periodExpression} as period,
+            CASE WHEN $4::text = '1 month' THEN date_trunc('month', t.date)::date ELSE t.date END as period,
             t.currency,
             SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,
             SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END) as expenses
           FROM transactions t
-          WHERE t.user_id = ? AND t.date >= ${startDateExpression} AND t.date <= date('now')
-          GROUP BY ${periodExpression}, t.currency
+          WHERE t.user_id = $1 AND t.date >= $2::date AND t.date <= $5::date
+          GROUP BY 1, t.currency
         )
         SELECT
-          periods.value as period,
+          TO_CHAR(periods.period, 'YYYY-MM-DD') as period,
           grouped.currency,
           COALESCE(grouped.income, 0) as income,
           COALESCE(grouped.expenses, 0) as expenses
         FROM periods
-        LEFT JOIN grouped ON grouped.period = periods.value
-        ORDER BY periods.value, grouped.currency
+        LEFT JOIN grouped ON grouped.period = periods.period
+        ORDER BY periods.period, grouped.currency
       `)
-      .all(req.userId!) as PeriodTrendRow[];
+      .all(req.userId!, startDateText, periodEndText, step, todayText) as PeriodTrendRow[];
 
     const currencies = Array.from(new Set(rows.flatMap((row) => (row.currency ? [row.currency] : []))));
     const { rates, updatedAt } = await getRates(currencies, displayCurrency);
@@ -371,13 +374,13 @@ router.get('/income-vs-expense', async (req: AuthRequest, res: Response) => {
     const { month } = monthSchema.parse(req.query);
     const targetMonth = month || new Date().toISOString().slice(0, 7);
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
-    const grouped = db
+    const grouped = await db
       .prepare(`
         SELECT type, currency, SUM(amount) as total
         FROM transactions
-        WHERE user_id = ? AND date LIKE ?
+        WHERE user_id = ? AND date::text LIKE ?
         GROUP BY type, currency
       `)
       .all(req.userId!, `${targetMonth}%`) as SummaryAmount[];
@@ -411,14 +414,14 @@ router.get('/top-categories', async (req: AuthRequest, res: Response) => {
     const targetMonth = (month as string) || new Date().toISOString().slice(0, 7);
     const numLimit = z.coerce.number().int().positive().max(100).default(5).parse(limit);
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
-    const rows = db
+    const rows = await db
       .prepare(`
         SELECT c.id, c.name, c.color, c.icon, t.currency, SUM(t.amount) as total
         FROM transactions t
         JOIN categories c ON t.category_id = c.id
-        WHERE t.user_id = ? AND t.type = 'expense' AND t.date LIKE ?
+        WHERE t.user_id = ? AND t.type = 'expense' AND t.date::text LIKE ?
         GROUP BY c.id, c.name, c.color, c.icon, t.currency
       `)
       .all(req.userId!, `${targetMonth}%`) as TopCategoryRow[];

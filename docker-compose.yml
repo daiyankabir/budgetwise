@@ -1,19 +1,35 @@
-version: '3.8'
-
 services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=budgetwise
+      - POSTGRES_USER=budgetwise
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-budgetwise_local_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U budgetwise -d budgetwise"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "3001:3000"
-    volumes:
-      - backend_data:/app/data
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DB_PATH=/app/data/budgetwise.db
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - DATABASE_URL=postgresql://budgetwise:${POSTGRES_PASSWORD:-budgetwise_local_password}@database:5432/budgetwise
+      - JWT_SECRET=${JWT_SECRET:-local-development-only-secret}
+    depends_on:
+      database:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -27,4 +43,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  backend_data:
+  postgres_data:

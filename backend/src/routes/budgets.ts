@@ -54,7 +54,7 @@ async function getRates(currencies: CurrencyCode[], target: CurrencyCode) {
 
 function handleError(error: unknown, res: Response, context: string) {
   if (error instanceof z.ZodError) {
-    return res.status(400).json({ error: error.errors[0].message });
+    return res.status(400).json({ error: error.issues[0].message });
   }
   return respondCurrencyError(error, res, context);
 }
@@ -67,8 +67,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
-    const budgets = db
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
+    const budgets = await db
       .prepare(`
         SELECT b.*, c.name as category_name, c.color as category_color, c.icon as category_icon
         FROM budgets b
@@ -104,8 +104,8 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
     }
 
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
-    const budgets = db
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
+    const budgets = await db
       .prepare(`
         SELECT b.*, c.name as category_name, c.color as category_color, c.icon as category_icon
         FROM budgets b
@@ -119,11 +119,11 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
 
     if (budgetIds.length > 0) {
       const placeholders = budgetIds.map(() => '?').join(',');
-      spent = db
+      spent = await db
         .prepare(`
           SELECT category_id, currency, SUM(amount) as total
           FROM transactions
-          WHERE user_id = ? AND type = 'expense' AND date LIKE ? AND category_id IN (${placeholders})
+          WHERE user_id = ? AND type = 'expense' AND date::text LIKE ? AND category_id IN (${placeholders})
           GROUP BY category_id, currency
         `)
         .all(req.userId!, `${month}%`, ...budgetIds) as SpentRow[];
@@ -193,12 +193,12 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/', (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const data = budgetSchema.parse(req.body);
     const db = getDatabase();
 
-    const category = db
+    const category = await db
       .prepare('SELECT * FROM categories WHERE id = ? AND (user_id = ? OR is_default = 1)')
       .get(data.category_id, req.userId!) as { type: string } | undefined;
 
@@ -209,7 +209,7 @@ router.post('/', (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Budgets can only be set for expense categories' });
     }
 
-    const result = db
+    const result = await db
       .prepare(`
         INSERT INTO budgets (user_id, category_id, amount, month, currency)
         VALUES (?, ?, ?, ?, ?)
@@ -218,7 +218,7 @@ router.post('/', (req: AuthRequest, res: Response) => {
       `)
       .run(req.userId!, data.category_id, data.amount, data.month, data.currency);
 
-    const budget = db
+    const budget = await db
       .prepare(`
         SELECT b.*, c.name as category_name, c.color as category_color, c.icon as category_icon
         FROM budgets b
@@ -230,14 +230,14 @@ router.post('/', (req: AuthRequest, res: Response) => {
     res.status(201).json({ budget });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     console.error('Create/Update budget error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.put('/:id', (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { amount, currency } = z.object({
       amount: z.number().positive(),
@@ -245,15 +245,17 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
     }).parse(req.body);
 
     const db = getDatabase();
-    const budget = db.prepare('SELECT * FROM budgets WHERE id = ? AND user_id = ?').get(req.params.id, req.userId!);
+    const budget = await db
+      .prepare('SELECT * FROM budgets WHERE id = ? AND user_id = ?')
+      .get(req.params.id, req.userId!) as BudgetRow | undefined;
     if (!budget) {
       return res.status(404).json({ error: 'Budget not found' });
     }
 
-    db.prepare('UPDATE budgets SET amount = ?, currency = ? WHERE id = ? AND user_id = ?')
-      .run(amount, currency ?? (budget as BudgetRow).currency, req.params.id, req.userId!);
+    await db.prepare('UPDATE budgets SET amount = ?, currency = ? WHERE id = ? AND user_id = ?')
+      .run(amount, currency ?? budget.currency, req.params.id, req.userId!);
 
-    const updatedBudget = db
+    const updatedBudget = await db
       .prepare(`
         SELECT b.*, c.name as category_name, c.color as category_color, c.icon as category_icon
         FROM budgets b
@@ -265,20 +267,27 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
     res.json({ budget: updatedBudget });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     console.error('Update budget error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.delete('/:id', (req: AuthRequest, res: Response) => {
-  const db = getDatabase();
-  const result = db.prepare('DELETE FROM budgets WHERE id = ? AND user_id = ?').run(req.params.id, req.userId!);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Budget not found' });
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDatabase();
+    const result = await db
+      .prepare('DELETE FROM budgets WHERE id = ? AND user_id = ?')
+      .run(req.params.id, req.userId!);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Budget not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete budget error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  res.json({ success: true });
 });
 
 export default router;

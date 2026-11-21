@@ -9,19 +9,20 @@
 
 ```
 budgetwise/
-├── docker-compose.yml          ← Orchestrates both services
+├── docker-compose.yml          ← Orchestrates the API, frontend, and PostgreSQL
 ├── .gitignore
 ├── README.md
 │
-├── backend/                    ← Node.js + Express + TypeScript + SQLite
+├── backend/                    ← Node.js + Express + TypeScript + PostgreSQL
 │   ├── Dockerfile              ← Multi-stage build
 │   ├── .dockerignore
-│   ├── .env                    ← JWT_SECRET, DB_PATH, PORT
+│   ├── .env                    ← JWT_SECRET, DATABASE_URL, PORT
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
-│       ├── index.ts            ← Express server entry point
-│       ├── database.ts         ← SQLite schema + 14 seed categories
+│       ├── index.ts            ← Local Express server entry point
+│       ├── app.ts              ← Express app used locally and by Vercel
+│       ├── database.ts         ← PostgreSQL schema + 14 seed categories
 │       ├── middleware/auth.ts  ← JWT verification middleware
 │       └── routes/
 │           ├── auth.ts         ← Register, Login, Get current user
@@ -109,7 +110,7 @@ npm start      # → http://localhost:4200 (proxied to backend)
 | UI | Angular Material |
 | Charts | Chart.js + ng2-charts |
 | Backend | Node.js + Express + TypeScript |
-| Database | SQLite (better-sqlite3) — zero config |
+| Database | PostgreSQL |
 | Auth | JWT + bcryptjs |
 | Container | Docker + Docker Compose |
 | Proxy | Nginx (production) |

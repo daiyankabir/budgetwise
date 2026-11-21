@@ -20,7 +20,7 @@ const currencySchema = z.object({
 
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const user = getDatabase()
+    const user = await getDatabase()
       .prepare('SELECT display_currency FROM users WHERE id = ?')
       .get(req.userId!) as { display_currency: CurrencyCode } | undefined;
 
@@ -51,7 +51,7 @@ router.put('/currency', async (req: AuthRequest, res: Response) => {
     const { displayCurrency } = currencySchema.parse(req.body);
     const snapshot = displayCurrency === 'USD' ? undefined : await getExchangeRateSnapshot();
 
-    const result = getDatabase()
+    const result = await getDatabase()
       .prepare('UPDATE users SET display_currency = ? WHERE id = ?')
       .run(displayCurrency, req.userId!);
 
@@ -70,7 +70,7 @@ router.put('/currency', async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     sendError(error, res, 'Update currency error');
   }

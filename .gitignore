@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+frontend/.angular/cache/
 
 # Environment files
 .env

@@ -1,8 +1,8 @@
 import { getDatabase } from '../database.js';
 import { CurrencyCode, SUPPORTED_CURRENCIES } from './currency.js';
 
-export function getUserDisplayCurrency(userId: number): CurrencyCode {
-  const user = getDatabase()
+export async function getUserDisplayCurrency(userId: number): Promise<CurrencyCode> {
+  const user = await getDatabase()
     .prepare('SELECT display_currency FROM users WHERE id = ?')
     .get(userId) as { display_currency: string } | undefined;
 

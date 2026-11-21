@@ -22,17 +22,17 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const db = getDatabase();
 
-    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const existingUser = await db.prepare('SELECT id FROM users WHERE email = ?').get(email);
     if (existingUser) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const result = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run(email, passwordHash);
+    const result = await db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run(email, passwordHash);
 
-    const userId = result.lastInsertRowid as number;
-    const user = db.prepare('SELECT display_currency FROM users WHERE id = ?').get(userId) as {
+    const userId = result.lastInsertRowid!;
+    const user = await db.prepare('SELECT display_currency FROM users WHERE id = ?').get(userId) as {
       display_currency: string;
     };
 
@@ -44,7 +44,7 @@ router.post('/register', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     console.error('Register error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -57,7 +57,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const db = getDatabase();
 
-    const user = db.prepare('SELECT id, email, password_hash, display_currency FROM users WHERE email = ?').get(email) as
+    const user = await db.prepare('SELECT id, email, password_hash, display_currency FROM users WHERE email = ?').get(email) as
       | { id: number; email: string; password_hash: string; display_currency: string }
       | undefined;
 
@@ -78,25 +78,29 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.get('/me', authMiddleware, (req: AuthRequest, res: Response) => {
-  const db = getDatabase();
+router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDatabase();
+    const user = await db
+      .prepare('SELECT id, email, created_at, display_currency FROM users WHERE id = ?')
+      .get(req.userId!) as { id: number; email: string; created_at: string; display_currency: string } | undefined;
 
-  const user = db.prepare('SELECT id, email, created_at, display_currency FROM users WHERE id = ?').get(req.userId!) as
-    | { id: number; email: string; created_at: string; display_currency: string }
-    | undefined;
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  res.json({ user });
 });
 
 export default router;

@@ -78,7 +78,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const { page, limit, type, category_id, start_date, end_date, search, sort_by, sort_order } = querySchema.parse(req.query);
 
     const db = getDatabase();
-    const displayCurrency = getUserDisplayCurrency(req.userId!);
+    const displayCurrency = await getUserDisplayCurrency(req.userId!);
 
     let whereClause = 'WHERE t.user_id = ?';
     const params: unknown[] = [req.userId!];
@@ -100,7 +100,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       params.push(end_date);
     }
     if (search) {
-      whereClause += ' AND (t.description LIKE ? OR c.name LIKE ?)';
+      whereClause += '       AND (t.description ILIKE ? OR c.name ILIKE ?)';
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -110,12 +110,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       JOIN categories c ON t.category_id = c.id
       ${whereClause}
     `);
-    const { total } = countStmt.get(...params) as { total: number };
+    const { total } = await countStmt.get(...params) as { total: number | string };
+    const totalCount = Number(total);
 
-    const currencies = db
+    const currencies = (await db
       .prepare(`SELECT DISTINCT t.currency FROM transactions t JOIN categories c ON t.category_id = c.id ${whereClause}`)
       .all(...params)
-      .map((row) => (row as { currency: CurrencyCode }).currency);
+    ).map((row) => (row as { currency: CurrencyCode }).currency);
     const needsRates = currencies.some((currency) => currency !== displayCurrency);
     const snapshot = needsRates || (sort_by === 'amount' && currencies.length > 0)
       ? await getExchangeRateSnapshot()
@@ -135,7 +136,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
           ])
         : [];
 
-    const transactions = db
+    const transactions = await db
       .prepare(
         `
       SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon, c.type as category_type
@@ -161,13 +162,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
       },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     if (error instanceof ExchangeRateUnavailableError) {
       return res.status(503).json({ error: error.message });
@@ -177,34 +178,36 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.get('/:id', (req: AuthRequest, res: Response) => {
-  const db = getDatabase();
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDatabase();
+    const transaction = await db
+      .prepare(`
+        SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon, c.type as category_type
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        WHERE t.id = ? AND t.user_id = ?
+      `)
+      .get(req.params.id, req.userId!) as TransactionRow | undefined;
 
-  const transaction = db
-    .prepare(
-      `
-    SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon, c.type as category_type
-    FROM transactions t
-    JOIN categories c ON t.category_id = c.id
-    WHERE t.id = ? AND t.user_id = ?
-  `
-    )
-    .get(req.params.id, req.userId!) as TransactionRow | undefined;
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
 
-  if (!transaction) {
-    return res.status(404).json({ error: 'Transaction not found' });
+    res.json({ transaction });
+  } catch (error) {
+    console.error('Get transaction error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  res.json({ transaction });
 });
 
-router.post('/', (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const data = transactionSchema.parse(req.body);
 
     const db = getDatabase();
 
-    const category = db
+    const category = await db
       .prepare('SELECT * FROM categories WHERE id = ? AND (user_id = ? OR is_default = 1)')
       .get(data.category_id, req.userId!) as CategoryRow | undefined;
 
@@ -216,7 +219,7 @@ router.post('/', (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Category type does not match transaction type' });
     }
 
-    const result = db
+    const result = await db
       .prepare(
         `
       INSERT INTO transactions (user_id, category_id, amount, type, description, date, currency)
@@ -225,7 +228,7 @@ router.post('/', (req: AuthRequest, res: Response) => {
       )
       .run(req.userId!, data.category_id, data.amount, data.type, data.description || null, data.date, data.currency);
 
-    const transaction = db
+    const transaction = await db
       .prepare(
         `
       SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon, c.type as category_type
@@ -239,20 +242,20 @@ router.post('/', (req: AuthRequest, res: Response) => {
     res.status(201).json({ transaction });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     console.error('Create transaction error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.put('/:id', (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const data = updateTransactionSchema.parse(req.body);
 
     const db = getDatabase();
 
-    const transaction = db
+    const transaction = await db
       .prepare('SELECT * FROM transactions WHERE id = ? AND user_id = ?')
       .get(req.params.id, req.userId!) as TransactionRow | undefined;
 
@@ -261,7 +264,7 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
     }
 
     if (data.category_id) {
-      const category = db
+      const category = await db
         .prepare('SELECT * FROM categories WHERE id = ? AND (user_id = ? OR is_default = 1)')
         .get(data.category_id, req.userId!) as CategoryRow | undefined;
 
@@ -309,9 +312,9 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
 
     values.push(req.params.id, req.userId!);
 
-    db.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values);
+    await db.prepare(`UPDATE transactions SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values);
 
-    const updatedTransaction = db
+    const updatedTransaction = await db
       .prepare(
         `
       SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon, c.type as category_type
@@ -325,28 +328,34 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
     res.json({ transaction: updatedTransaction });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
+      return res.status(400).json({ error: error.issues[0].message });
     }
     console.error('Update transaction error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.delete('/:id', (req: AuthRequest, res: Response) => {
-  const db = getDatabase();
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const db = getDatabase();
+    const result = await db
+      .prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?')
+      .run(req.params.id, req.userId!);
 
-  const result = db.prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?').run(req.params.id, req.userId!);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
 
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Transaction not found' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete transaction error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-
-  res.json({ success: true });
 });
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) => {
+router.post('/import', upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -361,7 +370,7 @@ router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) 
 
     const db = getDatabase();
 
-    const userCategories = db
+    const userCategories = await db
       .prepare('SELECT id, name, type FROM categories WHERE user_id = ? OR is_default = 1')
       .all(req.userId!) as CategoryRow[];
 
@@ -369,19 +378,6 @@ router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) 
     for (const cat of userCategories) {
       categoryMap.set(cat.name.toLowerCase(), { id: cat.id, type: cat.type });
     }
-
-    const insertStmt = db.prepare(
-      `
-      INSERT INTO transactions (user_id, category_id, amount, type, description, date, currency)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `
-    );
-
-    const insertMany = db.transaction((transactions: InsertTransaction[]) => {
-      for (const t of transactions) {
-        insertStmt.run(req.userId!, t.category_id, t.amount, t.type, t.description, t.date, t.currency);
-      }
-    });
 
     const results = { success: 0, failed: 0, errors: [] as string[] };
 
@@ -452,7 +448,28 @@ router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) 
     }
 
     if (toInsert.length > 0) {
-      insertMany(toInsert);
+      await db
+        .prepare(`
+          INSERT INTO transactions (user_id, category_id, amount, type, description, date, currency)
+          SELECT ?, category_id, amount, type, description, date, currency
+          FROM UNNEST(
+            ?::integer[],
+            ?::double precision[],
+            ?::text[],
+            ?::text[],
+            ?::date[],
+            ?::text[]
+          ) AS imported(category_id, amount, type, description, date, currency)
+        `)
+        .run(
+          req.userId!,
+          toInsert.map((transaction) => transaction.category_id),
+          toInsert.map((transaction) => transaction.amount),
+          toInsert.map((transaction) => transaction.type),
+          toInsert.map((transaction) => transaction.description),
+          toInsert.map((transaction) => transaction.date),
+          toInsert.map((transaction) => transaction.currency),
+        );
     }
 
     res.json(results);
