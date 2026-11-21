@@ -109,13 +109,13 @@ interface DialogData {
       justify-content: space-between;
       align-items: center;
       padding: 20px 24px;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--border);
     }
 
     .modal-title {
       font-size: 1.25rem;
       font-weight: 600;
-      color: #1e293b;
+      color: var(--text-primary);
       margin: 0;
     }
 
@@ -123,7 +123,7 @@ interface DialogData {
       background: none;
       border: none;
       font-size: 1.5rem;
-      color: #64748b;
+      color: var(--text-muted);
       cursor: pointer;
       width: 36px;
       height: 36px;
@@ -135,8 +135,8 @@ interface DialogData {
     }
 
     .modal-close:hover {
-      background: #f1f5f9;
-      color: #1e293b;
+      background: var(--bg-raised);
+      color: var(--text-primary);
     }
 
     .modal-body {
@@ -151,7 +151,7 @@ interface DialogData {
       display: block;
       font-size: 0.875rem;
       font-weight: 500;
-      color: #374151;
+      color: var(--text-primary);
       margin-bottom: 6px;
     }
 
@@ -160,8 +160,8 @@ interface DialogData {
       justify-content: flex-end;
       gap: 12px;
       padding: 16px 24px;
-      border-top: 1px solid #e2e8f0;
-      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      background: var(--bg-raised);
       border-radius: 0 0 16px 16px;
       margin: 0 -24px -24px -24px;
     }
@@ -171,7 +171,7 @@ interface DialogData {
       align-items: center;
       gap: 6px;
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 8px;
       font-size: 0.8125rem;
       font-weight: 500;
     }

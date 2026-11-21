@@ -20,7 +20,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
       <div class="page-header">
         <div>
           <h1 class="page-title">Transactions</h1>
-          <p style="color: #64748b; margin: 4px 0 0;">Manage your income and expenses</p>
+          <p class="page-subtitle">Manage your income and expenses</p>
         </div>
         <button mat-raised-button color="primary" (click)="openDialog()">
           <mat-icon>add</mat-icon>
@@ -98,7 +98,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
             <ng-container matColumnDef="type">
               <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
               <td mat-cell *matCellDef="let t">
-                <span class="category-badge" [style.background-color]="t.type === 'income' ? '#d1fae5' : '#fee2e2'" [style.color]="t.type === 'income' ? '#059669' : '#dc2626'">
+                <span class="category-badge transaction-type" [class.income]="t.type === 'income'" [class.expense]="t.type === 'expense'">
                   {{ t.type === 'income' ? 'Income' : 'Expense' }}
                 </span>
               </td>
@@ -136,8 +136,8 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
                     <span>Edit</span>
                   </button>
                   <button mat-menu-item (click)="deleteTransaction(t)">
-                    <mat-icon style="color: #dc2626;">delete</mat-icon>
-                    <span style="color: #dc2626;">Delete</span>
+                    <mat-icon class="destructive-action">delete</mat-icon>
+                    <span class="destructive-action">Delete</span>
                   </button>
                 </mat-menu>
               </td>
@@ -176,7 +176,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
     .conversion-note {
       display: block;
       margin-top: 2px;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 0.7rem;
     }
 
@@ -185,7 +185,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
       align-items: center;
       gap: 6px;
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 8px;
       font-size: 0.8125rem;
       font-weight: 500;
     }

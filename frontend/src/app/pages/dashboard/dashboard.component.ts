@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, QueryList, ViewChildren, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Chart, ChartOptions, registerables } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
@@ -8,6 +8,7 @@ import { CurrencyConversionRate, Transaction, SpendingByCategory, MonthlyTrend }
 import { formatMonth } from '../../utils/month.util';
 import { CurrencyService } from '../../services/currency.service';
 import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
+import { ThemeService } from '../../services/theme.service';
 
 Chart.register(...registerables);
 
@@ -18,9 +19,9 @@ Chart.register(...registerables);
       <div class="page-header">
         <div>
           <h1 class="page-title">Dashboard</h1>
-          <p style="color: #64748b; margin: 4px 0 0;">Welcome back! Here's your financial overview.</p>
+          <p class="page-subtitle">Monthly income, expenses, and balance</p>
         </div>
-        <mat-form-field appearance="outline" style="min-width: 180px;">
+        <mat-form-field appearance="outline" class="month-select" subscriptSizing="dynamic">
           <mat-label>Month</mat-label>
           <mat-select [(value)]="selectedMonth" (selectionChange)="onMonthChange($event.value)">
             <mat-option *ngFor="let m of availableMonths" [value]="m.value">{{ m.label }}</mat-option>
@@ -177,7 +178,7 @@ Chart.register(...registerables);
       justify-content: center;
       padding: 60px 20px;
       gap: 16px;
-      color: #64748b;
+      color: var(--text-muted);
     }
 
     .dashboard-content {
@@ -197,13 +198,13 @@ Chart.register(...registerables);
     .conversion-note {
       display: block;
       margin-top: 2px;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 0.7rem;
     }
 
     .exchange-rate-note {
       margin: -12px 0 24px;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 0.8rem;
     }
 
@@ -226,8 +227,11 @@ Chart.register(...registerables);
   `],
 })
 export class DashboardComponent implements OnInit {
+  @ViewChildren(BaseChartDirective) charts!: QueryList<BaseChartDirective>;
+
   private destroyRef = inject(DestroyRef);
   public currencyService = inject(CurrencyService);
+  public themeService = inject(ThemeService);
   readonly formatExchangeRate = formatExchangeRate;
   loading = true;
   selectedMonth = '';
@@ -246,6 +250,9 @@ export class DashboardComponent implements OnInit {
     this.currencyService.currencyChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.loadDashboard());
+    this.themeService.themeChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.charts?.forEach((chart) => chart.update()));
     this.selectedMonth = this.getCurrentMonth();
     this.availableMonths = this.generateMonths();
     this.loadDashboard();
@@ -378,14 +385,14 @@ export class DashboardComponent implements OnInit {
         {
           label: 'Income',
           data: data.map(d => d.income),
-          backgroundColor: '#10b981',
+          backgroundColor: this.themeService.palette().income,
           borderRadius: 6,
           maxBarThickness: 40,
         },
         {
           label: 'Expenses',
           data: data.map(d => d.expenses),
-          backgroundColor: '#ef4444',
+          backgroundColor: this.themeService.palette().expense,
           borderRadius: 6,
           maxBarThickness: 40,
         },
@@ -421,7 +428,7 @@ export class DashboardComponent implements OnInit {
       },
       y: {
         beginAtZero: true,
-        grid: { color: '#e2e8f0' },
+        grid: { color: () => this.themeService.palette().border },
         ticks: {
           font: { size: 11, family: 'Inter' },
           callback: (value: string | number) => this.formatCurrency(Number(value)).replace(/\.00$/, ''),

@@ -13,7 +13,7 @@ import { AuthService } from '../../services/auth.service';
           <div class="auth-logo">
             <mat-icon>account_balance_wallet</mat-icon>
           </div>
-          <h1 class="auth-title">Welcome Back</h1>
+          <h1 class="auth-title">Sign in</h1>
           <p class="auth-subtitle">Sign in to your BudgetWise account</p>
         </div>
 
@@ -79,7 +79,7 @@ import { AuthService } from '../../services/auth.service';
       display: block;
       font-size: 0.875rem;
       font-weight: 500;
-      color: #374151;
+      color: var(--text-primary);
       margin-bottom: 6px;
     }
   `],

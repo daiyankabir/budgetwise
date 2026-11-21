@@ -70,15 +70,15 @@ interface BudgetDialogData {
   styles: [`
     .full-width { width: 100%; }
     .modal { width: 100%; min-width: 0; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
-    .modal-title { font-size: 1.25rem; font-weight: 600; color: #1e293b; margin: 0; }
-    .modal-close { background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background 0.2s ease, color 0.2s ease; }
-    .modal-close:hover { background: #f1f5f9; color: #1e293b; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+    .modal-title { font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; }
+    .modal-close { background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .modal-close:hover { background: var(--bg-raised); color: var(--text-primary); }
     .modal-body { padding: 24px; }
     .form-field { margin-bottom: 20px; }
-    .form-label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 6px; }
-    .modal-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; border-radius: 0 0 16px 16px; margin: 0 -24px -24px -24px; }
-    .category-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 0.8125rem; font-weight: 500; }
+    .form-label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 6px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); background: var(--bg-raised); border-radius: 0 0 16px 16px; margin: 0 -24px -24px -24px; }
+    .category-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; }
     .category-icon { font-size: 0.875rem; }
   `],
 })

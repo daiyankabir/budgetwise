@@ -5,105 +5,122 @@ import { CurrencyCode } from '../../models/models';
 import { CurrencyService } from '../../services/currency.service';
 import { formatExchangeRate } from '../../utils/currency.util';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { ThemeService } from '../../services/theme.service';
+import { MatSelect } from '@angular/material/select';
 
 @Component({
   selector: 'app-navbar',
   template: `
     <mat-toolbar class="navbar">
-      <button type="button" class="navbar-brand" aria-label="BudgetWise home" (click)="goToDashboard()">
-        <mat-icon>account_balance_wallet</mat-icon>
-        <span>BudgetWise</span>
-      </button>
-
-      <nav class="navbar-nav" *ngIf="authService.isAuthenticated()">
-        <a mat-button routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
-          <mat-icon>dashboard</mat-icon>
-          <span>Dashboard</span>
-        </a>
-        <a mat-button routerLink="/transactions" routerLinkActive="active">
-          <mat-icon>receipt_long</mat-icon>
-          <span>Transactions</span>
-        </a>
-        <a mat-button routerLink="/budgets" routerLinkActive="active">
-          <mat-icon>account_balance</mat-icon>
-          <span>Budgets</span>
-        </a>
-        <a mat-button routerLink="/reports" routerLinkActive="active">
-          <mat-icon>analytics</mat-icon>
-          <span>Reports</span>
-        </a>
-      </nav>
-
-      <button
-        mat-icon-button
-        class="mobile-nav-toggle"
-        [matMenuTriggerFor]="mobileNavigation"
-        *ngIf="authService.isAuthenticated()"
-        aria-label="Open navigation menu">
-        <mat-icon>menu</mat-icon>
-      </button>
-
-      <div class="navbar-actions">
-        <div class="currency-setting" *ngIf="authService.isAuthenticated()">
-          <label class="sr-only" for="display-currency">Display currency</label>
-          <select
-            id="display-currency"
-            name="displayCurrency"
-            #currencySelect
-            [ngModel]="currencyService.displayCurrency()"
-            [disabled]="savingCurrency"
-            (ngModelChange)="onDisplayCurrencyChange($event, currencySelect)">
-            <option *ngFor="let option of currencyService.options" [value]="option.code">
-              {{ option.code }}
-            </option>
-          </select>
-          <span
-            class="exchange-rate"
-            *ngIf="currencyService.exchangeRate() as rate"
-            [title]="rateUpdatedAtTitle()">
-            1 {{ rate.from }} = {{ formatExchangeRate(rate.rate) }} {{ rate.to }}
-          </span>
-        </div>
-
-        <button mat-icon-button [matMenuTriggerFor]="userMenu" *ngIf="authService.isAuthenticated()" aria-label="User menu">
-          <mat-icon>account_circle</mat-icon>
+      <div class="navbar-inner">
+        <button type="button" class="navbar-brand" aria-label="BudgetWise home" (click)="goToDashboard()">
+          <mat-icon>account_balance_wallet</mat-icon>
+          <span>BudgetWise</span>
         </button>
 
-        <a mat-button routerLink="/login" *ngIf="!authService.isAuthenticated()">Login</a>
-        <a mat-button routerLink="/register" *ngIf="!authService.isAuthenticated()" color="primary">Sign Up</a>
-      </div>
+        <nav class="navbar-nav" *ngIf="authService.isAuthenticated()">
+          <a mat-button routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+            <mat-icon>dashboard</mat-icon>
+            <span>Dashboard</span>
+          </a>
+          <a mat-button routerLink="/transactions" routerLinkActive="active">
+            <mat-icon>receipt_long</mat-icon>
+            <span>Transactions</span>
+          </a>
+          <a mat-button routerLink="/budgets" routerLinkActive="active">
+            <mat-icon>account_balance</mat-icon>
+            <span>Budgets</span>
+          </a>
+          <a mat-button routerLink="/reports" routerLinkActive="active">
+            <mat-icon>analytics</mat-icon>
+            <span>Reports</span>
+          </a>
+        </nav>
 
-      <mat-menu #userMenu="matMenu">
-        <div class="menu-header">
-          <div class="menu-user-info">
-            <strong>{{ authService.user()?.email }}</strong>
+        <button
+          mat-icon-button
+          class="mobile-nav-toggle"
+          [matMenuTriggerFor]="mobileNavigation"
+          *ngIf="authService.isAuthenticated()"
+          aria-label="Open navigation menu">
+          <mat-icon>menu</mat-icon>
+        </button>
+
+        <div class="navbar-actions">
+          <button
+            mat-icon-button
+            type="button"
+            class="theme-toggle"
+            [attr.aria-label]="themeToggleLabel()"
+            [matTooltip]="themeToggleLabel()"
+            (click)="toggleTheme()">
+            <mat-icon>{{ themeService.current() === 'dark' ? 'light_mode' : 'dark_mode' }}</mat-icon>
+          </button>
+
+          <div class="currency-setting" *ngIf="authService.isAuthenticated()">
+            <label class="sr-only" for="display-currency">Display currency</label>
+            <mat-select
+              id="display-currency"
+              name="displayCurrency"
+              #currencySelect
+              class="currency-select"
+              panelClass="currency-select-panel"
+              aria-label="Display currency"
+              [ngModel]="currencyService.displayCurrency()"
+              [disabled]="savingCurrency"
+              (ngModelChange)="onDisplayCurrencyChange($event, currencySelect)">
+              <mat-option *ngFor="let option of currencyService.options" [value]="option.code">
+                {{ option.code }}
+              </mat-option>
+            </mat-select>
+            <span
+              class="exchange-rate"
+              *ngIf="currencyService.exchangeRate() as rate"
+              [title]="rateUpdatedAtTitle()">
+              1 {{ rate.from }} = {{ formatExchangeRate(rate.rate) }} {{ rate.to }}
+            </span>
           </div>
-          <mat-divider></mat-divider>
-        </div>
-        <button mat-menu-item (click)="logout()">
-          <mat-icon>logout</mat-icon>
-          <span>Logout</span>
-        </button>
-      </mat-menu>
 
-      <mat-menu #mobileNavigation="matMenu">
-        <button mat-menu-item routerLink="/dashboard">
-          <mat-icon>dashboard</mat-icon>
-          <span>Dashboard</span>
-        </button>
-        <button mat-menu-item routerLink="/transactions">
-          <mat-icon>receipt_long</mat-icon>
-          <span>Transactions</span>
-        </button>
-        <button mat-menu-item routerLink="/budgets">
-          <mat-icon>account_balance</mat-icon>
-          <span>Budgets</span>
-        </button>
-        <button mat-menu-item routerLink="/reports">
-          <mat-icon>analytics</mat-icon>
-          <span>Reports</span>
-        </button>
-      </mat-menu>
+          <button mat-icon-button [matMenuTriggerFor]="userMenu" *ngIf="authService.isAuthenticated()" aria-label="User menu">
+            <mat-icon>account_circle</mat-icon>
+          </button>
+
+          <a mat-button routerLink="/login" *ngIf="!authService.isAuthenticated()">Login</a>
+          <a mat-button routerLink="/register" *ngIf="!authService.isAuthenticated()" color="primary">Sign Up</a>
+        </div>
+
+        <mat-menu #userMenu="matMenu">
+          <div class="menu-header">
+            <div class="menu-user-info">
+              <strong>{{ authService.user()?.email }}</strong>
+            </div>
+            <mat-divider></mat-divider>
+          </div>
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Logout</span>
+          </button>
+        </mat-menu>
+
+        <mat-menu #mobileNavigation="matMenu">
+          <button mat-menu-item routerLink="/dashboard">
+            <mat-icon>dashboard</mat-icon>
+            <span>Dashboard</span>
+          </button>
+          <button mat-menu-item routerLink="/transactions">
+            <mat-icon>receipt_long</mat-icon>
+            <span>Transactions</span>
+          </button>
+          <button mat-menu-item routerLink="/budgets">
+            <mat-icon>account_balance</mat-icon>
+            <span>Budgets</span>
+          </button>
+          <button mat-menu-item routerLink="/reports">
+            <mat-icon>analytics</mat-icon>
+            <span>Reports</span>
+          </button>
+        </mat-menu>
+      </div>
     </mat-toolbar>
   `,
   styles: [`
@@ -112,13 +129,28 @@ import { MatSnackBar } from '@angular/material/snack-bar';
     }
 
     .navbar {
-      background: white;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-card);
       position: sticky;
       top: 0;
       z-index: 100;
-      padding: 0 24px;
+      width: 100%;
+      padding: 0;
       height: 64px;
+      min-height: 64px;
+      justify-content: center;
+    }
+
+    .navbar-inner {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 1520px;
+      height: 100%;
+      padding: 0 32px;
+      margin: 0 auto;
     }
 
     .navbar-brand {
@@ -126,7 +158,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
       align-items: center;
       gap: 10px;
       cursor: pointer;
-      color: #0f766e;
+      color: var(--accent);
       text-decoration: none;
       border: 0;
       background: transparent;
@@ -141,7 +173,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
     .navbar-brand span {
       font-size: 1.25rem;
-      font-weight: 700;
+      font-weight: 600;
     }
 
     .navbar-nav {
@@ -155,21 +187,22 @@ import { MatSnackBar } from '@angular/material/snack-bar';
       display: flex;
       align-items: center;
       gap: 8px;
-      color: #475569;
+      color: var(--text-secondary);
       font-weight: 500;
       border-radius: 8px;
       padding: 8px 16px;
-      transition: all 0.2s ease;
+      transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+                  color 180ms cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     .navbar-nav a:hover {
-      background: #f0fdfa;
-      color: #0d9488;
+      background: var(--accent-soft);
+      color: var(--accent);
     }
 
     .navbar-nav a.active {
-      background: #f0fdfa;
-      color: #0d9488;
+      background: var(--accent-soft);
+      color: var(--accent);
     }
 
     .navbar-nav mat-icon {
@@ -185,29 +218,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
       margin-left: auto;
     }
 
-    .currency-setting {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      white-space: nowrap;
-    }
-
-    .currency-setting select {
-      height: 36px;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      background: #fff;
-      color: #334155;
-      padding: 0 8px;
-      font: inherit;
-    }
-
-    .currency-setting select:disabled {
-      opacity: 0.6;
+    .theme-toggle {
+      color: var(--text-secondary);
     }
 
     .exchange-rate {
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 0.75rem;
     }
 
@@ -229,12 +245,18 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
     .menu-user-info {
       font-size: 0.875rem;
-      color: #374151;
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 1024px) {
+      .navbar-inner {
+        padding: 0 24px;
+      }
     }
 
     @media (max-width: 768px) {
-      .navbar {
-        padding: 0 16px;
+      .navbar-inner {
+        padding: 0 20px;
       }
 
       .navbar-nav {
@@ -261,6 +283,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
         display: none;
       }
     }
+
+    @media (max-width: 480px) {
+      .navbar-inner {
+        padding: 0 16px;
+      }
+    }
   `],
 })
 export class NavbarComponent {
@@ -270,6 +298,7 @@ export class NavbarComponent {
   constructor(
     public authService: AuthService,
     public currencyService: CurrencyService,
+    public themeService: ThemeService,
     private router: Router,
     private snackBar: MatSnackBar,
   ) {
@@ -292,7 +321,7 @@ export class NavbarComponent {
     this.router.navigateByUrl('/dashboard');
   }
 
-  onDisplayCurrencyChange(currency: CurrencyCode, select: HTMLSelectElement) {
+  onDisplayCurrencyChange(currency: CurrencyCode, select: MatSelect) {
     this.savingCurrency = true;
     this.currencyService.setDisplayCurrency(currency).subscribe({
       next: () => {
@@ -304,6 +333,20 @@ export class NavbarComponent {
         this.snackBar.open(error?.error?.error || 'Failed to update currency', 'Close', { duration: 4000 });
       },
     });
+  }
+
+  toggleTheme() {
+    const theme = this.themeService.current() === 'dark' ? 'light' : 'dark';
+    try {
+      this.themeService.setTheme(theme);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save theme preference';
+      this.snackBar.open(message, 'Close', { duration: 4000 });
+    }
+  }
+
+  themeToggleLabel(): string {
+    return this.themeService.current() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
   }
 
   rateUpdatedAtTitle(): string {

@@ -11,6 +11,7 @@ A modern, full-stack personal finance application built with Angular 17, Node.js
 - **📈 Reports** — Savings rate, income vs expense comparison, top categories, monthly trends
 - **💱 Currency conversion** — Per-transaction and per-budget currencies, with server-side conversion into a saved display currency
 - **🔢 Compact amounts** — Large values use K/M/B notation (for example, €1.2K or €3M)
+- **🎨 Themes** — Switch between light and graphite dark; the selection is saved in this browser
 
 ## 🛠 Tech Stack
 
@@ -85,7 +86,7 @@ budgetwise/
 │   └── src/
 │       ├── index.html
 │       ├── main.ts
-│       ├── styles.scss         ← Teal/green theme, animations, utils
+│       ├── styles.scss         ← Theme palettes, design tokens, and utilities
 │       └── app/
 │           ├── app.component.ts
 │           ├── app.config.ts   ← Router, HTTP, Animations, Charts
@@ -95,12 +96,13 @@ budgetwise/
 │           ├── services/
 │           │   ├── api.service.ts        ← 20 endpoint methods
 │           │   ├── auth.service.ts       ← JWT + auto-login
-│           │   └── auth.interceptor.ts   ← Bearer token injection
+│           │   ├── auth.interceptor.ts   ← Bearer token injection
+│           │   └── theme.service.ts      ← Browser-persisted theme preference
 │           ├── components/
 │           │   ├── navbar/               ← Responsive Material toolbar
 │           │   └── transaction-dialog/   ← Add/Edit transaction modal
 │           └── pages/
-│               ├── login/        ← Gradient auth page
+│               ├── login/        ← Theme-aware sign in
 │               ├── register/     ← Account creation
 │               ├── dashboard/    ← Charts + summary cards
 │               ├── transactions/ ← Filtered table + CRUD
@@ -228,11 +230,7 @@ Existing transactions and budgets are migrated as USD. New transaction and budge
 
 ## 🎨 Theming
 
-The app uses a custom teal/green Material theme defined in `frontend/src/styles.scss`. Primary colors:
-
-- Primary: `#14b8a6` (teal)
-- Accent: `#eab308` (amber)
-- Warn: `#ef4444` (red)
+Use the theme button in the top navigation to switch between Light and Dark. The choice is saved in this browser and applies across authentication pages, dashboards, forms, dialogs, and charts.
 
 ## 📄 License
 

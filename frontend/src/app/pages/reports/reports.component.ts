@@ -1,12 +1,14 @@
-import { Component, DestroyRef, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, QueryList, signal, computed, ViewChildren } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Chart, ChartOptions, registerables } from 'chart.js';
+import { BaseChartDirective } from 'ng2-charts';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../services/api.service';
 import { CurrencyConversionRate, SpendingByCategory, MonthlyTrend, TopCategory } from '../../models/models';
 import { formatMonth } from '../../utils/month.util';
 import { CurrencyService } from '../../services/currency.service';
 import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
+import { ThemeService } from '../../services/theme.service';
 
 Chart.register(...registerables);
 
@@ -17,9 +19,9 @@ Chart.register(...registerables);
       <div class="page-header">
         <div>
           <h1 class="page-title">Reports</h1>
-          <p style="color: #64748b; margin: 4px 0 0;">Analyze your financial patterns and trends</p>
+          <p class="page-subtitle">Analyze your financial patterns and trends</p>
         </div>
-        <mat-form-field appearance="outline" style="min-width: 180px;">
+        <mat-form-field appearance="outline" class="month-select" subscriptSizing="dynamic">
           <mat-label>Month</mat-label>
           <mat-select [(value)]="selectedMonth" (selectionChange)="onMonthChange($event.value)">
             <mat-option *ngFor="let m of availableMonths" [value]="m.value">{{ m.label }}</mat-option>
@@ -181,7 +183,7 @@ Chart.register(...registerables);
                   <td>{{ formatCurrency(cat.total) }}</td>
                   <td>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                      <div style="flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                      <div style="flex: 1; height: 6px; background: var(--track); border-radius: 3px; overflow: hidden;">
                         <div style="height: 100%; width: {{ cat.percentage }}%; background: {{ cat.color }}; border-radius: 3px; transition: width 0.3s ease;"></div>
                       </div>
                       <span style="font-weight: 500; min-width: 50px;">{{ cat.percentage.toFixed(1) }}%</span>
@@ -203,7 +205,7 @@ Chart.register(...registerables);
       justify-content: center;
       padding: 60px 20px;
       gap: 16px;
-      color: #64748b;
+      color: var(--text-muted);
     }
 
     .reports-content {
@@ -212,7 +214,7 @@ Chart.register(...registerables);
 
     .exchange-rate-note {
       margin: -12px 0 24px;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 0.8rem;
     }
 
@@ -237,7 +239,7 @@ Chart.register(...registerables);
       align-items: center;
       gap: 6px;
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 8px;
       font-size: 0.8125rem;
       font-weight: 500;
     }
@@ -254,10 +256,13 @@ Chart.register(...registerables);
   `],
 })
 export class ReportsComponent implements OnInit {
+  @ViewChildren(BaseChartDirective) charts!: QueryList<BaseChartDirective>;
+
   private api = inject(ApiService);
   private snackBar = inject(MatSnackBar);
   private destroyRef = inject(DestroyRef);
   public currencyService = inject(CurrencyService);
+  public themeService = inject(ThemeService);
   readonly formatExchangeRate = formatExchangeRate;
 
   loading = signal(true);
@@ -281,6 +286,9 @@ export class ReportsComponent implements OnInit {
     this.currencyService.currencyChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.loadReports());
+    this.themeService.themeChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.charts?.forEach((chart) => chart.update()));
     this.loadReports();
   }
 
@@ -366,7 +374,7 @@ export class ReportsComponent implements OnInit {
         {
           label: 'Amount',
           data: [data.income, data.expenses],
-          backgroundColor: ['#10b981', '#ef4444'],
+          backgroundColor: [this.themeService.palette().income, this.themeService.palette().expense],
           borderRadius: 6,
           maxBarThickness: 60,
         },
@@ -408,7 +416,7 @@ export class ReportsComponent implements OnInit {
     scales: {
       x: {
         beginAtZero: true,
-        grid: { color: '#e2e8f0' },
+        grid: { color: () => this.themeService.palette().border },
         ticks: {
           font: { size: 11, family: 'Inter' },
           callback: (value: string | number) => this.formatCurrency(Number(value)).replace(/\.00$/, ''),
@@ -433,8 +441,8 @@ export class ReportsComponent implements OnInit {
         {
           label: 'Income',
           data: data.map(d => d.income),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderColor: this.themeService.palette().income,
+          backgroundColor: this.themeService.palette().incomeFill,
           borderWidth: 2,
           fill: true,
           tension: 0.3,
@@ -444,8 +452,8 @@ export class ReportsComponent implements OnInit {
         {
           label: 'Expenses',
           data: data.map(d => d.expenses),
-          borderColor: '#ef4444',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderColor: this.themeService.palette().expense,
+          backgroundColor: this.themeService.palette().expenseFill,
           borderWidth: 2,
           fill: true,
           tension: 0.3,
@@ -479,7 +487,7 @@ export class ReportsComponent implements OnInit {
       },
       y: {
         beginAtZero: true,
-        grid: { color: '#e2e8f0' },
+        grid: { color: () => this.themeService.palette().border },
         ticks: {
           font: { size: 11, family: 'Inter' },
           callback: (value: string | number) => this.formatCurrency(Number(value)).replace(/\.00$/, ''),

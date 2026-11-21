@@ -17,10 +17,10 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
       <div class="page-header">
         <div>
           <h1 class="page-title">Budgets</h1>
-          <p style="color: #64748b; margin: 4px 0 0;">Set and track monthly budgets by category</p>
+          <p class="page-subtitle">Set and track monthly budgets by category</p>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <mat-form-field appearance="outline" style="min-width: 180px;">
+        <div class="page-header-actions">
+          <mat-form-field appearance="outline" class="month-select" subscriptSizing="dynamic">
             <mat-label>Month</mat-label>
             <mat-select [(value)]="selectedMonth" (selectionChange)="onMonthChange($event.value)">
               <mat-option *ngFor="let m of availableMonths" [value]="m.value">{{ m.label }}</mat-option>
@@ -60,7 +60,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
             </div>
           </div>
           <div class="summary-card">
-            <div class="summary-icon" [style.background]="budgetSummary().totalRemaining >= 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)'">
+            <div class="summary-icon" [class.positive]="budgetSummary().totalRemaining >= 0" [class.negative]="budgetSummary().totalRemaining < 0">
               <mat-icon>wallet</mat-icon>
             </div>
             <div class="summary-content">
@@ -71,7 +71,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
             </div>
           </div>
           <div class="summary-card">
-            <div class="summary-icon" [style.background]="budgetSummary().overallPercentage <= 100 ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)'">
+            <div class="summary-icon" [class.positive]="budgetSummary().overallPercentage <= 100" [class.negative]="budgetSummary().overallPercentage > 100">
               <mat-icon>percent</mat-icon>
             </div>
             <div class="summary-content">
@@ -131,7 +131,7 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
                     </div>
                     <div class="budget-info" [class.over]="b.isOverBudget">
                       <span>{{ b.percentage.toFixed(1) }}% used</span>
-                      <span *ngIf="b.isOverBudget" style="color: #dc2626; font-weight: 600;">Over budget!</span>
+                      <span *ngIf="b.isOverBudget" class="over-budget-label">Over budget</span>
                     </div>
                   </td>
                   <td>
@@ -144,8 +144,8 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
                         <span>Edit</span>
                       </button>
                       <button mat-menu-item (click)="deleteBudget(b)">
-                        <mat-icon style="color: #dc2626;">delete</mat-icon>
-                        <span style="color: #dc2626;">Delete</span>
+                        <mat-icon class="destructive-action">delete</mat-icon>
+                        <span class="destructive-action">Delete</span>
                       </button>
                     </mat-menu>
                   </td>
@@ -165,22 +165,22 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
       justify-content: center;
       padding: 60px 20px;
       gap: 16px;
-      color: #64748b;
+      color: var(--text-muted);
     }
 
     .over-budget td {
-      background: #fef2f2;
+      background: var(--negative-soft);
     }
 
     .currency-note {
       display: block;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 0.7rem;
     }
 
     .budget-progress {
       height: 8px;
-      background: #e2e8f0;
+      background: var(--track);
       border-radius: 4px;
       overflow: hidden;
       margin-top: 8px;
@@ -193,27 +193,36 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
     }
 
     .budget-progress-bar.normal {
-      background: linear-gradient(90deg, #14b8a6, #0d9488);
+      background: var(--accent-strong);
     }
 
     .budget-progress-bar.warning {
-      background: linear-gradient(90deg, #facc15, #eab308);
+      background: var(--warning);
     }
 
     .budget-progress-bar.danger {
-      background: linear-gradient(90deg, #ef4444, #dc2626);
+      background: var(--negative);
     }
 
     .budget-info {
       display: flex;
       justify-content: space-between;
       font-size: 0.8125rem;
-      color: #64748b;
+      color: var(--text-muted);
       margin-top: 6px;
     }
 
     .budget-info.over {
-      color: #dc2626;
+      color: var(--negative);
+      font-weight: 500;
+    }
+
+    .over-budget-label,
+    .destructive-action {
+      color: var(--negative);
+    }
+
+    .over-budget-label {
       font-weight: 500;
     }
 
@@ -223,8 +232,10 @@ import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../..
         align-items: stretch;
       }
 
-      .page-header > div:last-child {
+      .page-header-actions {
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
       }
     }
   `],
