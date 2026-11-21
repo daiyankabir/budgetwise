@@ -7,6 +7,7 @@ import categoryRoutes from './routes/categories.js';
 import transactionRoutes from './routes/transactions.js';
 import budgetRoutes from './routes/budgets.js';
 import dashboardRoutes from './routes/dashboard.js';
+import settingsRoutes from './routes/settings.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

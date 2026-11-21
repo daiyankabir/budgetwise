@@ -1,12 +1,14 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { Category, Transaction } from '../../models/models';
+import { Category, CurrencyCode, Transaction } from '../../models/models';
 import { ApiService } from '../../services/api.service';
+import { CURRENCY_OPTIONS } from '../../services/currency.service';
 
 interface DialogData {
   transaction?: Transaction;
   categories: Category[];
+  displayCurrency: CurrencyCode;
 }
 
 @Component({
@@ -42,6 +44,17 @@ interface DialogData {
               </mat-option>
             </mat-select>
             <mat-error *ngIf="form.get('category_id')?.hasError('required')">Category is required</mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="form-field">
+          <label class="form-label">Currency</label>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-select formControlName="currency" required>
+              <mat-option *ngFor="let option of currencyOptions" [value]="option.code">
+                {{ option.label }} ({{ option.code }})
+              </mat-option>
+            </mat-select>
           </mat-form-field>
         </div>
 
@@ -172,6 +185,7 @@ export class TransactionDialogComponent implements OnInit {
   form: FormGroup;
   submitting = false;
   filteredCategories: Category[] = [];
+  readonly currencyOptions = CURRENCY_OPTIONS;
 
   constructor(
     private fb: FormBuilder,
@@ -183,6 +197,7 @@ export class TransactionDialogComponent implements OnInit {
       type: ['expense', Validators.required],
       category_id: [null, Validators.required],
       amount: [null, [Validators.required, Validators.min(0.01)]],
+      currency: [data.transaction?.currency ?? data.displayCurrency, Validators.required],
       date: [new Date().toISOString().split('T')[0], Validators.required],
       description: [''],
     });
@@ -202,6 +217,7 @@ export class TransactionDialogComponent implements OnInit {
         type: t.type,
         category_id: t.category_id,
         amount: t.amount,
+        currency: t.currency,
         date: t.date,
         description: t.description || '',
       });

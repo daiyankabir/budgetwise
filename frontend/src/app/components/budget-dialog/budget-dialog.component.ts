@@ -1,13 +1,15 @@
 import { Component, Inject } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { Category, Budget } from '../../models/models';
+import { Category, Budget, CurrencyCode } from '../../models/models';
 import { ApiService } from '../../services/api.service';
+import { CURRENCY_OPTIONS } from '../../services/currency.service';
 
 interface BudgetDialogData {
   budget?: Budget;
   categories: Category[];
   month: string;
+  displayCurrency: CurrencyCode;
 }
 
 @Component({
@@ -36,9 +38,19 @@ interface BudgetDialogData {
         </div>
 
         <div class="form-field">
+          <label class="form-label">Currency</label>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-select formControlName="currency" required>
+              <mat-option *ngFor="let option of currencyOptions" [value]="option.code">
+                {{ option.label }} ({{ option.code }})
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="form-field">
           <label class="form-label">Budget Amount</label>
           <mat-form-field appearance="outline" class="full-width">
-            <span matPrefix>$</span>
             <input matInput type="number" formControlName="amount" placeholder="0.00" step="0.01" min="0.01" required>
             <mat-error *ngIf="form.get('amount')?.hasError('required')">Amount is required</mat-error>
             <mat-error *ngIf="form.get('amount')?.hasError('min')">Amount must be greater than 0</mat-error>
@@ -73,6 +85,7 @@ interface BudgetDialogData {
 export class BudgetDialogComponent {
   form: FormGroup;
   submitting = false;
+  readonly currencyOptions = CURRENCY_OPTIONS;
 
   constructor(
     private fb: FormBuilder,
@@ -83,12 +96,14 @@ export class BudgetDialogComponent {
     this.form = this.fb.group({
       category_id: [null, Validators.required],
       amount: [null, [Validators.required, Validators.min(0.01)]],
+      currency: [this.data.budget?.currency ?? this.data.displayCurrency, Validators.required],
     });
 
     if (this.data.budget) {
       this.form.patchValue({
         category_id: this.data.budget.category_id,
         amount: this.data.budget.amount,
+        currency: this.data.budget.currency,
       });
     }
   }
@@ -97,11 +112,11 @@ export class BudgetDialogComponent {
     if (this.form.invalid) return;
 
     this.submitting = true;
-    const { category_id, amount } = this.form.value;
+    const { category_id, amount, currency } = this.form.value;
 
     const request = this.data.budget
-      ? this.api.updateBudget(this.data.budget.id, amount)
-      : this.api.createOrUpdateBudget({ category_id, amount, month: this.data.month });
+      ? this.api.updateBudget(this.data.budget.id, amount, currency)
+      : this.api.createOrUpdateBudget({ category_id, amount, month: this.data.month, currency });
 
     request.subscribe({
       next: () => {

@@ -5,10 +5,12 @@ A modern, full-stack personal finance application built with Angular 17, Node.js
 ## ✨ Features
 
 - **🔐 Authentication** — JWT-based auth with bcrypt password hashing, auto-login
-- **📊 Dashboard** — Summary cards, doughnut chart (spending by category), bar chart (6-month trend), recent transactions
+- **📊 Dashboard** — Summary cards, doughnut chart (spending by category), bar chart (6-month trend), recent transactions; clicking the logo returns to the current month
 - **💳 Transactions** — Full CRUD with filtering, pagination, and CSV bulk import
 - **🎯 Budgets** — Per-category monthly budgets with progress bars and over-budget alerts
 - **📈 Reports** — Savings rate, income vs expense comparison, top categories, monthly trends
+- **💱 Currency conversion** — Per-transaction and per-budget currencies, with server-side conversion into a saved display currency
+- **🔢 Compact amounts** — Large values use K/M/B notation (for example, €1.2K or €3M)
 
 ## 🛠 Tech Stack
 
@@ -132,6 +134,10 @@ NODE_ENV=development
 - `POST /api/auth/login` — Login
 - `GET /api/auth/me` — Get current user
 
+### Settings
+- `GET /api/settings` — Get display currency and current USD exchange rate
+- `PUT /api/settings/currency` — Save the display currency (`displayCurrency`)
+
 ### Categories
 - `GET /api/categories` — List all categories (default + user)
 - `POST /api/categories` — Create custom category
@@ -206,16 +212,19 @@ npm run test     # Run unit tests
 For bulk transaction import, use a CSV with these columns:
 
 ```csv
-date,type,category,amount,description
-2024-01-15,expense,Food & Dining,25.50,Lunch with friends
-2024-01-16,income,Salary,5000.00,Monthly salary
+date,type,category,amount,currency,description
+2024-01-15,expense,Food & Dining,25.50,USD,Lunch with friends
+2024-01-16,income,Salary,5000.00,EUR,Monthly salary
 ```
 
 - `date`: YYYY-MM-DD format
 - `type`: `income` or `expense`
 - `category`: Must match existing category name (case-insensitive)
 - `amount`: Positive number
+- `currency`: Optional ISO code (`USD`, `BDT`, `EUR`, `GBP`, `INR`, `CAD`, `AUD`, or `JPY`); defaults to USD
 - `description`: Optional
+
+Existing transactions and budgets are migrated as USD. New transaction and budget forms default to the saved display currency. The backend totals amounts per source currency before converting them using the latest cached rates from ExchangeRate-API; the application shows the applied rates and their update time. The display currency defaults to EUR.
 
 ## 🎨 Theming
 

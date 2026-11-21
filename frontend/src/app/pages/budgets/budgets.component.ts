@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -6,6 +7,8 @@ import { ApiService } from '../../services/api.service';
 import { Budget, BudgetOverviewItem, Category } from '../../models/models';
 import { BudgetDialogComponent } from '../../components/budget-dialog/budget-dialog.component';
 import { formatMonth } from '../../utils/month.util';
+import { CurrencyService } from '../../services/currency.service';
+import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
 
 @Component({
   selector: 'app-budgets',
@@ -112,10 +115,15 @@ import { formatMonth } from '../../utils/month.util';
                       {{ b.category_name }}
                     </span>
                   </td>
-                  <td>{{ formatCurrency(b.amount) }}</td>
-                  <td>{{ formatCurrency(b.spent) }}</td>
+                  <td>
+                    {{ formatCurrency(b.displayAmount ?? b.amount) }}
+                    <small class="currency-note" *ngIf="b.currency !== currencyService.displayCurrency()">
+                      1 {{ b.currency }} = {{ formatExchangeRate(b.conversionRate ?? 1) }} {{ currencyService.displayCurrency() }}
+                    </small>
+                  </td>
+                  <td>{{ formatCurrency(b.displaySpent ?? b.spent) }}</td>
                   <td [class]="b.remaining >= 0 ? 'amount-positive' : 'amount-negative'">
-                    {{ formatCurrency(b.remaining) }}
+                    {{ formatCurrency(b.displayRemaining ?? b.remaining) }}
                   </td>
                   <td style="min-width: 200px;">
                     <div class="budget-progress">
@@ -162,6 +170,12 @@ import { formatMonth } from '../../utils/month.util';
 
     .over-budget td {
       background: #fef2f2;
+    }
+
+    .currency-note {
+      display: block;
+      color: #64748b;
+      font-size: 0.7rem;
     }
 
     .budget-progress {
@@ -220,6 +234,9 @@ export class BudgetsComponent implements OnInit {
   private api = inject(ApiService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
+  private destroyRef = inject(DestroyRef);
+  public currencyService = inject(CurrencyService);
+  readonly formatExchangeRate = formatExchangeRate;
 
   loading = signal(true);
   selectedMonth = signal(this.getCurrentMonth());
@@ -230,6 +247,9 @@ export class BudgetsComponent implements OnInit {
   expenseCategories = signal<Category[]>([]);
 
   ngOnInit() {
+    this.currencyService.currencyChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.loadBudgets());
     this.loadExpenseCategories();
     this.loadBudgets();
   }
@@ -271,9 +291,9 @@ export class BudgetsComponent implements OnInit {
         this.budgetSummary.set(res.summary);
         this.loading.set(false);
       },
-      error: () => {
+      error: (error) => {
         this.loading.set(false);
-        this.snackBar.open('Failed to load budgets', 'Close', { duration: 3000 });
+        this.snackBar.open(error?.error?.error || 'Failed to load budgets', 'Close', { duration: 4000 });
       },
     });
   }
@@ -298,7 +318,12 @@ export class BudgetsComponent implements OnInit {
     const dialogRef = this.dialog.open(BudgetDialogComponent, {
       width: '500px',
       maxWidth: '90vw',
-      data: { budget, categories: availableCategories, month: this.selectedMonth() },
+      data: {
+        budget,
+        categories: availableCategories,
+        month: this.selectedMonth(),
+        displayCurrency: this.currencyService.displayCurrency(),
+      },
     });
 
     dialogRef.afterClosed().subscribe((result) => {
@@ -323,10 +348,6 @@ export class BudgetsComponent implements OnInit {
   }
 
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return formatCurrencyValue(amount, this.currencyService.displayCurrency());
   }
 }

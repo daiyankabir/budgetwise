@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { CurrencyCode, CurrencySettings } from '../models/models';
 
 @Injectable({
   providedIn: 'root',
@@ -41,15 +42,23 @@ export class ApiService {
 
   // Auth
   register(data: { email: string; password: string }) {
-    return this.post<{ user: { id: number; email: string }; token: string }>('/auth/register', data);
+    return this.post<{ user: { id: number; email: string; display_currency: CurrencyCode }; token: string }>('/auth/register', data);
   }
 
   login(data: { email: string; password: string }) {
-    return this.post<{ user: { id: number; email: string }; token: string }>('/auth/login', data);
+    return this.post<{ user: { id: number; email: string; display_currency: CurrencyCode }; token: string }>('/auth/login', data);
   }
 
   getCurrentUser() {
-    return this.get<{ user: { id: number; email: string; created_at: string } }>('/auth/me');
+    return this.get<{ user: { id: number; email: string; created_at: string; display_currency: CurrencyCode } }>('/auth/me');
+  }
+
+  getCurrencySettings() {
+    return this.get<CurrencySettings>('/settings');
+  }
+
+  updateDisplayCurrency(displayCurrency: CurrencyCode) {
+    return this.put<Omit<CurrencySettings, 'supportedCurrencies'>>('/settings/currency', { displayCurrency });
   }
 
   // Categories
@@ -91,6 +100,10 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
+        displayAmount: number;
+        displayCurrency: CurrencyCode;
+        conversionRate: number;
         type: 'income' | 'expense';
         description?: string;
         date: string;
@@ -101,6 +114,9 @@ export class ApiService {
         category_type: string;
       }>;
       pagination: { page: number; limit: number; total: number; totalPages: number };
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/transactions', params);
   }
 
@@ -111,6 +127,7 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
         type: 'income' | 'expense';
         description?: string;
         date: string;
@@ -126,6 +143,7 @@ export class ApiService {
   createTransaction(data: {
     category_id: number;
     amount: number;
+    currency?: CurrencyCode;
     type: 'income' | 'expense';
     description?: string;
     date: string;
@@ -136,6 +154,7 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
         type: 'income' | 'expense';
         description?: string;
         date: string;
@@ -151,6 +170,7 @@ export class ApiService {
   updateTransaction(id: number, data: Partial<{
     category_id: number;
     amount: number;
+    currency?: CurrencyCode;
     type: 'income' | 'expense';
     description?: string;
     date: string;
@@ -161,6 +181,7 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
         type: 'income' | 'expense';
         description?: string;
         date: string;
@@ -191,12 +212,18 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
+        displayAmount: number;
+        displayCurrency: CurrencyCode;
         month: string;
         created_at: string;
         category_name: string;
         category_color: string;
         category_icon: string;
       }>;
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/budgets', { month });
   }
 
@@ -207,6 +234,7 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
         month: string;
         created_at: string;
         category_name: string;
@@ -214,6 +242,11 @@ export class ApiService {
         category_icon: string;
         spent: number;
         remaining: number;
+        displayAmount: number;
+        displaySpent: number;
+        displayRemaining: number;
+        displayCurrency: CurrencyCode;
+        conversionRate: number;
         percentage: number;
         isOverBudget: boolean;
       }>;
@@ -223,6 +256,9 @@ export class ApiService {
         totalRemaining: number;
         overallPercentage: number;
       };
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/budgets/overview', { month });
   }
 
@@ -230,6 +266,7 @@ export class ApiService {
     category_id: number;
     amount: number;
     month: string;
+    currency?: CurrencyCode;
   }) {
     return this.post<{
       budget: {
@@ -237,6 +274,7 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
         month: string;
         created_at: string;
         category_name: string;
@@ -246,20 +284,21 @@ export class ApiService {
     }>('/budgets', data);
   }
 
-  updateBudget(id: number, amount: number) {
+  updateBudget(id: number, amount: number, currency?: CurrencyCode) {
     return this.put<{
       budget: {
         id: number;
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
         month: string;
         created_at: string;
         category_name: string;
         category_color: string;
         category_icon: string;
       };
-    }>(`/budgets/${id}`, { amount });
+    }>(`/budgets/${id}`, { amount, currency });
   }
 
   deleteBudget(id: number) {
@@ -280,6 +319,10 @@ export class ApiService {
         user_id: number;
         category_id: number;
         amount: number;
+        currency: CurrencyCode;
+        displayAmount: number;
+        displayCurrency: CurrencyCode;
+        conversionRate: number;
         type: 'income' | 'expense';
         description?: string;
         date: string;
@@ -289,6 +332,9 @@ export class ApiService {
         category_icon: string;
         category_type: string;
       }>;
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/dashboard/summary', month ? { month } : {});
   }
 
@@ -303,6 +349,9 @@ export class ApiService {
         percentage: number;
       }>;
       total: number;
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/dashboard/spending-by-category', month ? { month } : {});
   }
 
@@ -313,6 +362,9 @@ export class ApiService {
         income: number;
         expenses: number;
       }>;
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/dashboard/monthly-trend', { months });
   }
 
@@ -320,6 +372,9 @@ export class ApiService {
     return this.get<{
       income: number;
       expenses: number;
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/dashboard/income-vs-expense', month ? { month } : {});
   }
 
@@ -332,6 +387,9 @@ export class ApiService {
         icon: string;
         total: number;
       }>;
+      displayCurrency: CurrencyCode;
+      conversionRates: Array<{ from: CurrencyCode; to: CurrencyCode; rate: number }>;
+      ratesUpdatedAt: string | null;
     }>('/dashboard/top-categories', month ? { month, limit } : { limit });
   }
 }

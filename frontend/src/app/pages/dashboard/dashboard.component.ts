@@ -1,9 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Chart, ChartOptions, registerables } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../services/api.service';
-import { Transaction, SpendingByCategory, MonthlyTrend } from '../../models/models';
+import { CurrencyConversionRate, Transaction, SpendingByCategory, MonthlyTrend } from '../../models/models';
 import { formatMonth } from '../../utils/month.util';
+import { CurrencyService } from '../../services/currency.service';
+import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
 
 Chart.register(...registerables);
 
@@ -70,6 +74,14 @@ Chart.register(...registerables);
               <div class="summary-value">{{ summary.savingsRate.toFixed(1) }}%</div>
             </div>
           </div>
+        </div>
+
+        <div class="exchange-rate-note" *ngIf="displayConversionRates.length > 0">
+          Latest rates:
+          <span *ngFor="let rate of displayConversionRates; let last = last">
+            1 {{ rate.from }} = {{ formatExchangeRate(rate.rate) }} {{ rate.to }}<span *ngIf="!last"> · </span>
+          </span>
+          <span *ngIf="ratesUpdatedAt"> (updated {{ ratesUpdatedAt }})</span>
         </div>
 
         <!-- Charts Row -->
@@ -143,8 +155,11 @@ Chart.register(...registerables);
                   <td>{{ t.description || '—' }}</td>
                   <td class="amount-col">
                     <span [class]="t.type === 'income' ? 'amount-positive' : 'amount-negative'">
-                      {{ t.type === 'income' ? '+' : '-' }}{{ formatCurrency(t.amount) }}
+                      {{ t.type === 'income' ? '+' : '-' }}{{ formatCurrency(t.displayAmount ?? t.amount) }}
                     </span>
+                    <small class="conversion-note" *ngIf="t.currency !== currencyService.displayCurrency()">
+                      1 {{ t.currency }} = {{ formatExchangeRate(t.conversionRate ?? 1) }} {{ currencyService.displayCurrency() }}
+                    </small>
                   </td>
                 </tr>
               </tbody>
@@ -179,6 +194,19 @@ Chart.register(...registerables);
       white-space: nowrap;
     }
 
+    .conversion-note {
+      display: block;
+      margin-top: 2px;
+      color: #64748b;
+      font-size: 0.7rem;
+    }
+
+    .exchange-rate-note {
+      margin: -12px 0 24px;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+
     .charts-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -198,6 +226,9 @@ Chart.register(...registerables);
   `],
 })
 export class DashboardComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
+  public currencyService = inject(CurrencyService);
+  readonly formatExchangeRate = formatExchangeRate;
   loading = true;
   selectedMonth = '';
   availableMonths: { value: string; label: string }[] = [];
@@ -206,10 +237,15 @@ export class DashboardComponent implements OnInit {
   recentTransactions: Transaction[] = [];
   spendingData: SpendingByCategory[] = [];
   trendData: MonthlyTrend[] = [];
+  conversionRates: CurrencyConversionRate[] = [];
+  ratesUpdatedAt: string | null = null;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private snackBar: MatSnackBar) {}
 
   ngOnInit() {
+    this.currencyService.currencyChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.loadDashboard());
     this.selectedMonth = this.getCurrentMonth();
     this.availableMonths = this.generateMonths();
     this.loadDashboard();
@@ -227,9 +263,12 @@ export class DashboardComponent implements OnInit {
       next: (res) => {
         this.summary = res.summary;
         this.recentTransactions = res.recentTransactions;
+        this.conversionRates = res.conversionRates;
+        this.ratesUpdatedAt = res.ratesUpdatedAt;
       },
-      error: () => {
+      error: (error) => {
         this.loading = false;
+        this.snackBar.open(error?.error?.error || 'Failed to load dashboard summary', 'Close', { duration: 4000 });
       },
     });
 
@@ -238,14 +277,18 @@ export class DashboardComponent implements OnInit {
         this.spendingData = res.data;
         this.loading = false;
       },
-      error: () => {
+      error: (error) => {
         this.loading = false;
+        this.snackBar.open(error?.error?.error || 'Failed to load spending data', 'Close', { duration: 4000 });
       },
     });
 
     this.api.getMonthlyTrend(6).subscribe({
       next: (res) => {
         this.trendData = res.trend;
+      },
+      error: (error) => {
+        this.snackBar.open(error?.error?.error || 'Failed to load monthly trend', 'Close', { duration: 4000 });
       },
     });
   }
@@ -267,11 +310,11 @@ export class DashboardComponent implements OnInit {
   }
 
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return formatCurrencyValue(amount, this.currencyService.displayCurrency());
+  }
+
+  get displayConversionRates(): CurrencyConversionRate[] {
+    return this.conversionRates.filter((rate) => rate.from !== rate.to);
   }
 
   formatDate(dateStr: string): string {

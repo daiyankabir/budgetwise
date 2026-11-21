@@ -4,6 +4,16 @@ import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { getDatabase } from '../database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import {
+  CurrencyCode,
+  ExchangeRateUnavailableError,
+  convertAmount,
+  getConversionRate,
+  getExchangeRateSnapshot,
+  listConversionRates,
+  SUPPORTED_CURRENCIES,
+} from '../services/currency.js';
+import { getUserDisplayCurrency } from '../services/user-currency.js';
 
 const router = Router();
 
@@ -15,6 +25,7 @@ const transactionSchema = z.object({
   type: z.enum(['income', 'expense']),
   description: z.string().max(500, 'Description too long').optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+  currency: z.enum(SUPPORTED_CURRENCIES).default('USD'),
 });
 
 const updateTransactionSchema = transactionSchema.partial();
@@ -36,6 +47,7 @@ interface TransactionRow {
   user_id: number;
   category_id: number;
   amount: number;
+  currency: CurrencyCode;
   type: 'income' | 'expense';
   description: string | null;
   date: string;
@@ -55,16 +67,18 @@ interface CategoryRow {
 interface InsertTransaction {
   category_id: number;
   amount: number;
+  currency: CurrencyCode;
   type: 'income' | 'expense';
   description: string | null;
   date: string;
 }
 
-router.get('/', (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { page, limit, type, category_id, start_date, end_date, search, sort_by, sort_order } = querySchema.parse(req.query);
 
     const db = getDatabase();
+    const displayCurrency = getUserDisplayCurrency(req.userId!);
 
     let whereClause = 'WHERE t.user_id = ?';
     const params: unknown[] = [req.userId!];
@@ -98,8 +112,28 @@ router.get('/', (req: AuthRequest, res: Response) => {
     `);
     const { total } = countStmt.get(...params) as { total: number };
 
+    const currencies = db
+      .prepare(`SELECT DISTINCT t.currency FROM transactions t JOIN categories c ON t.category_id = c.id ${whereClause}`)
+      .all(...params)
+      .map((row) => (row as { currency: CurrencyCode }).currency);
+    const needsRates = currencies.some((currency) => currency !== displayCurrency);
+    const snapshot = needsRates || (sort_by === 'amount' && currencies.length > 0)
+      ? await getExchangeRateSnapshot()
+      : undefined;
+    const rates = snapshot?.rates ?? { [displayCurrency]: 1 };
     const offset = (page - 1) * limit;
     const sortColumn = { date: 't.date', type: 't.type', amount: 't.amount' }[sort_by];
+    const sortExpression =
+      sort_by === 'amount' && currencies.length > 0
+        ? `CASE t.currency ${currencies.map(() => 'WHEN ? THEN t.amount * ?').join(' ')} ELSE t.amount END`
+        : sortColumn;
+    const sortParams =
+      sort_by === 'amount' && currencies.length > 0
+        ? currencies.flatMap((currency) => [
+            currency,
+            getConversionRate(currency, displayCurrency, rates),
+          ])
+        : [];
 
     const transactions = db
       .prepare(
@@ -108,14 +142,22 @@ router.get('/', (req: AuthRequest, res: Response) => {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
       ${whereClause}
-      ORDER BY ${sortColumn} ${sort_order.toUpperCase()}, t.date DESC, t.created_at DESC
+      ORDER BY ${sortExpression} ${sort_order.toUpperCase()}, t.date DESC, t.created_at DESC
       LIMIT ? OFFSET ?
     `
       )
-      .all(...params, limit, offset) as TransactionRow[];
+      .all(...params, ...sortParams, limit, offset) as TransactionRow[];
 
     res.json({
-      transactions,
+      transactions: transactions.map((transaction) => ({
+        ...transaction,
+        displayAmount: convertAmount(transaction.amount, transaction.currency, displayCurrency, rates),
+        displayCurrency,
+        conversionRate: getConversionRate(transaction.currency, displayCurrency, rates),
+      })),
+      displayCurrency,
+      conversionRates: listConversionRates(currencies, displayCurrency, rates),
+      ratesUpdatedAt: snapshot?.updatedAt ?? null,
       pagination: {
         page,
         limit,
@@ -126,6 +168,9 @@ router.get('/', (req: AuthRequest, res: Response) => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message });
+    }
+    if (error instanceof ExchangeRateUnavailableError) {
+      return res.status(503).json({ error: error.message });
     }
     console.error('Get transactions error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -174,11 +219,11 @@ router.post('/', (req: AuthRequest, res: Response) => {
     const result = db
       .prepare(
         `
-      INSERT INTO transactions (user_id, category_id, amount, type, description, date)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (user_id, category_id, amount, type, description, date, currency)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `
       )
-      .run(req.userId!, data.category_id, data.amount, data.type, data.description || null, data.date);
+      .run(req.userId!, data.category_id, data.amount, data.type, data.description || null, data.date, data.currency);
 
     const transaction = db
       .prepare(
@@ -253,6 +298,10 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
       updates.push('date = ?');
       values.push(data.date);
     }
+    if (data.currency !== undefined) {
+      updates.push('currency = ?');
+      values.push(data.currency);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -323,14 +372,14 @@ router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) 
 
     const insertStmt = db.prepare(
       `
-      INSERT INTO transactions (user_id, category_id, amount, type, description, date)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (user_id, category_id, amount, type, description, date, currency)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `
     );
 
     const insertMany = db.transaction((transactions: InsertTransaction[]) => {
       for (const t of transactions) {
-        insertStmt.run(req.userId!, t.category_id, t.amount, t.type, t.description, t.date);
+        insertStmt.run(req.userId!, t.category_id, t.amount, t.type, t.description, t.date, t.currency);
       }
     });
 
@@ -372,6 +421,13 @@ router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) 
           continue;
         }
 
+        const currency = (row.currency || 'USD').toUpperCase();
+        if (!SUPPORTED_CURRENCIES.includes(currency as CurrencyCode)) {
+          results.failed++;
+          results.errors.push(`Row ${rowNum}: Unsupported currency "${row.currency}"`);
+          continue;
+        }
+
         const date = row.date;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           results.failed++;
@@ -382,6 +438,7 @@ router.post('/import', upload.single('file'), (req: AuthRequest, res: Response) 
         toInsert.push({
           category_id: category.id,
           amount,
+          currency: currency as CurrencyCode,
           type: type as 'income' | 'expense',
           description: row.description || null,
           date,

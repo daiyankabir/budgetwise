@@ -1,8 +1,12 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Chart, ChartOptions, registerables } from 'chart.js';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../services/api.service';
-import { SpendingByCategory, MonthlyTrend, TopCategory } from '../../models/models';
+import { CurrencyConversionRate, SpendingByCategory, MonthlyTrend, TopCategory } from '../../models/models';
 import { formatMonth } from '../../utils/month.util';
+import { CurrencyService } from '../../services/currency.service';
+import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
 
 Chart.register(...registerables);
 
@@ -21,6 +25,14 @@ Chart.register(...registerables);
             <mat-option *ngFor="let m of availableMonths" [value]="m.value">{{ m.label }}</mat-option>
           </mat-select>
         </mat-form-field>
+      </div>
+
+      <div class="exchange-rate-note" *ngIf="displayConversionRates.length > 0">
+        Latest rates:
+        <span *ngFor="let rate of displayConversionRates; let last = last">
+          1 {{ rate.from }} = {{ formatExchangeRate(rate.rate) }} {{ rate.to }}<span *ngIf="!last"> · </span>
+        </span>
+        <span *ngIf="ratesUpdatedAt"> (updated {{ ratesUpdatedAt }})</span>
       </div>
 
       <div *ngIf="loading()" class="loading-state">
@@ -198,6 +210,12 @@ Chart.register(...registerables);
       animation: fadeIn 0.3s ease;
     }
 
+    .exchange-rate-note {
+      margin: -12px 0 24px;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+
     .charts-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -237,6 +255,10 @@ Chart.register(...registerables);
 })
 export class ReportsComponent implements OnInit {
   private api = inject(ApiService);
+  private snackBar = inject(MatSnackBar);
+  private destroyRef = inject(DestroyRef);
+  public currencyService = inject(CurrencyService);
+  readonly formatExchangeRate = formatExchangeRate;
 
   loading = signal(true);
   selectedMonth = signal(this.getCurrentMonth());
@@ -246,6 +268,8 @@ export class ReportsComponent implements OnInit {
   spendingByCategory = signal<SpendingByCategory[]>([]);
   monthlyTrend = signal<MonthlyTrend[]>([]);
   topCategories = signal<TopCategory[]>([]);
+  conversionRates: CurrencyConversionRate[] = [];
+  ratesUpdatedAt: string | null = null;
 
   netSavings = computed(() => this.incomeVsExpense().income - this.incomeVsExpense().expenses);
   savingsRate = computed(() => {
@@ -254,6 +278,9 @@ export class ReportsComponent implements OnInit {
   });
 
   ngOnInit() {
+    this.currencyService.currencyChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.loadReports());
     this.loadReports();
   }
 
@@ -284,6 +311,11 @@ export class ReportsComponent implements OnInit {
     this.api.getIncomeVsExpense(this.selectedMonth()).subscribe({
       next: (res) => {
         this.incomeVsExpense.set(res);
+        this.conversionRates = res.conversionRates;
+        this.ratesUpdatedAt = res.ratesUpdatedAt;
+      },
+      error: (error) => {
+        this.snackBar.open(error?.error?.error || 'Failed to load income and expense totals', 'Close', { duration: 4000 });
       },
     });
 
@@ -291,11 +323,17 @@ export class ReportsComponent implements OnInit {
       next: (res) => {
         this.spendingByCategory.set(res.data);
       },
+      error: (error) => {
+        this.snackBar.open(error?.error?.error || 'Failed to load category spending', 'Close', { duration: 4000 });
+      },
     });
 
     this.api.getMonthlyTrend(6).subscribe({
       next: (res) => {
         this.monthlyTrend.set(res.trend);
+      },
+      error: (error) => {
+        this.snackBar.open(error?.error?.error || 'Failed to load monthly trend', 'Close', { duration: 4000 });
       },
     });
 
@@ -304,18 +342,19 @@ export class ReportsComponent implements OnInit {
         this.topCategories.set(res.topCategories);
         this.loading.set(false);
       },
-      error: () => {
+      error: (error) => {
         this.loading.set(false);
+        this.snackBar.open(error?.error?.error || 'Failed to load top categories', 'Close', { duration: 4000 });
       },
     });
   }
 
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    return formatCurrencyValue(amount, this.currencyService.displayCurrency());
+  }
+
+  get displayConversionRates(): CurrencyConversionRate[] {
+    return this.conversionRates.filter((rate) => rate.from !== rate.to);
   }
 
   // Income vs Expense Horizontal Bar Chart

@@ -32,11 +32,14 @@ router.post('/register', async (req: Request, res: Response) => {
     const result = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)').run(email, passwordHash);
 
     const userId = result.lastInsertRowid as number;
+    const user = db.prepare('SELECT display_currency FROM users WHERE id = ?').get(userId) as {
+      display_currency: string;
+    };
 
     const token = generateToken(userId);
 
     res.status(201).json({
-      user: { id: userId, email },
+      user: { id: userId, email, display_currency: user.display_currency },
       token,
     });
   } catch (error) {
@@ -54,8 +57,8 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const db = getDatabase();
 
-    const user = db.prepare('SELECT id, email, password_hash FROM users WHERE email = ?').get(email) as
-      | { id: number; email: string; password_hash: string }
+    const user = db.prepare('SELECT id, email, password_hash, display_currency FROM users WHERE email = ?').get(email) as
+      | { id: number; email: string; password_hash: string; display_currency: string }
       | undefined;
 
     if (!user) {
@@ -70,7 +73,7 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = generateToken(user.id);
 
     res.json({
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, display_currency: user.display_currency },
       token,
     });
   } catch (error) {
@@ -85,8 +88,8 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/me', authMiddleware, (req: AuthRequest, res: Response) => {
   const db = getDatabase();
 
-  const user = db.prepare('SELECT id, email, created_at FROM users WHERE id = ?').get(req.userId!) as
-    | { id: number; email: string; created_at: string }
+  const user = db.prepare('SELECT id, email, created_at, display_currency FROM users WHERE id = ?').get(req.userId!) as
+    | { id: number; email: string; created_at: string; display_currency: string }
     | undefined;
 
   if (!user) {

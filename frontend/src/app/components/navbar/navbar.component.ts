@@ -1,15 +1,19 @@
-import { Component } from '@angular/core';
+import { Component, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { CurrencyCode } from '../../models/models';
+import { CurrencyService } from '../../services/currency.service';
+import { formatExchangeRate } from '../../utils/currency.util';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-navbar',
   template: `
     <mat-toolbar class="navbar">
-      <div class="navbar-brand" routerLink="/dashboard">
+      <button type="button" class="navbar-brand" aria-label="BudgetWise home" (click)="goToDashboard()">
         <mat-icon>account_balance_wallet</mat-icon>
         <span>BudgetWise</span>
-      </div>
+      </button>
 
       <nav class="navbar-nav" *ngIf="authService.isAuthenticated()">
         <a mat-button routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
@@ -40,6 +44,27 @@ import { AuthService } from '../../services/auth.service';
       </button>
 
       <div class="navbar-actions">
+        <div class="currency-setting" *ngIf="authService.isAuthenticated()">
+          <label class="sr-only" for="display-currency">Display currency</label>
+          <select
+            id="display-currency"
+            name="displayCurrency"
+            #currencySelect
+            [ngModel]="currencyService.displayCurrency()"
+            [disabled]="savingCurrency"
+            (ngModelChange)="onDisplayCurrencyChange($event, currencySelect)">
+            <option *ngFor="let option of currencyService.options" [value]="option.code">
+              {{ option.code }}
+            </option>
+          </select>
+          <span
+            class="exchange-rate"
+            *ngIf="currencyService.exchangeRate() as rate"
+            [title]="rateUpdatedAtTitle()">
+            1 {{ rate.from }} = {{ formatExchangeRate(rate.rate) }} {{ rate.to }}
+          </span>
+        </div>
+
         <button mat-icon-button [matMenuTriggerFor]="userMenu" *ngIf="authService.isAuthenticated()" aria-label="User menu">
           <mat-icon>account_circle</mat-icon>
         </button>
@@ -103,6 +128,9 @@ import { AuthService } from '../../services/auth.service';
       cursor: pointer;
       color: #0f766e;
       text-decoration: none;
+      border: 0;
+      background: transparent;
+      padding: 0;
     }
 
     .navbar-brand mat-icon {
@@ -157,6 +185,44 @@ import { AuthService } from '../../services/auth.service';
       margin-left: auto;
     }
 
+    .currency-setting {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .currency-setting select {
+      height: 36px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      padding: 0 8px;
+      font: inherit;
+    }
+
+    .currency-setting select:disabled {
+      opacity: 0.6;
+    }
+
+    .exchange-rate {
+      color: #64748b;
+      font-size: 0.75rem;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     .menu-header {
       padding: 12px 16px;
     }
@@ -182,11 +248,68 @@ import { AuthService } from '../../services/auth.service';
       .navbar-brand span {
         display: none;
       }
+
+      .navbar-actions {
+        gap: 4px;
+      }
+
+      .currency-setting {
+        margin-right: 4px;
+      }
+
+      .exchange-rate {
+        display: none;
+      }
     }
   `],
 })
 export class NavbarComponent {
-  constructor(public authService: AuthService, private router: Router) {}
+  savingCurrency = false;
+  readonly formatExchangeRate = formatExchangeRate;
+
+  constructor(
+    public authService: AuthService,
+    public currencyService: CurrencyService,
+    private router: Router,
+    private snackBar: MatSnackBar,
+  ) {
+    effect(() => {
+      if (this.authService.isAuthenticated()) {
+        this.currencyService.loadSettings().subscribe({
+          error: (error) => {
+            this.snackBar.open(error?.error?.error || 'Failed to load currency settings', 'Close', { duration: 4000 });
+          },
+        });
+      }
+    });
+  }
+
+  goToDashboard() {
+    if (this.router.url.split('?')[0] === '/dashboard') {
+      window.location.reload();
+      return;
+    }
+    this.router.navigateByUrl('/dashboard');
+  }
+
+  onDisplayCurrencyChange(currency: CurrencyCode, select: HTMLSelectElement) {
+    this.savingCurrency = true;
+    this.currencyService.setDisplayCurrency(currency).subscribe({
+      next: () => {
+        this.savingCurrency = false;
+      },
+      error: (error) => {
+        this.savingCurrency = false;
+        select.value = this.currencyService.displayCurrency();
+        this.snackBar.open(error?.error?.error || 'Failed to update currency', 'Close', { duration: 4000 });
+      },
+    });
+  }
+
+  rateUpdatedAtTitle(): string {
+    const updatedAt = this.currencyService.ratesUpdatedAt();
+    return updatedAt ? `Exchange rates updated ${updatedAt}` : 'No conversion required';
+  }
 
   logout() {
     this.authService.logout();

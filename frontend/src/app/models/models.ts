@@ -1,7 +1,23 @@
+export type CurrencyCode = 'USD' | 'BDT' | 'EUR' | 'GBP' | 'INR' | 'CAD' | 'AUD' | 'JPY';
+
 export interface User {
   id: number;
   email: string;
+  display_currency?: CurrencyCode;
   created_at?: string;
+}
+
+export interface CurrencyConversionRate {
+  from: CurrencyCode;
+  to: CurrencyCode;
+  rate: number;
+}
+
+export interface CurrencySettings {
+  displayCurrency: CurrencyCode;
+  supportedCurrencies: CurrencyCode[];
+  exchangeRate: CurrencyConversionRate;
+  ratesUpdatedAt: string | null;
 }
 
 export interface Category {
@@ -19,6 +35,10 @@ export interface Transaction {
   user_id: number;
   category_id: number;
   amount: number;
+  currency: CurrencyCode;
+  displayAmount?: number;
+  displayCurrency?: CurrencyCode;
+  conversionRate?: number;
   type: 'income' | 'expense';
   description?: string;
   date: string;
@@ -34,6 +54,12 @@ export interface Budget {
   user_id: number;
   category_id: number;
   amount: number;
+  currency: CurrencyCode;
+  displayAmount?: number;
+  displaySpent?: number;
+  displayRemaining?: number;
+  displayCurrency?: CurrencyCode;
+  conversionRate?: number;
   month: string;
   created_at: string;
   category_name?: string;

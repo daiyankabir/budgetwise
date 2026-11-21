@@ -2,7 +2,7 @@ import { Injectable, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize, tap } from 'rxjs';
 import { ApiService } from './api.service';
-import { User, AuthResponse } from '../models/models';
+import { User, AuthResponse, CurrencyCode } from '../models/models';
 
 @Injectable({
   providedIn: 'root',
@@ -91,5 +91,15 @@ export class AuthService {
         this.logout();
       },
     });
+  }
+
+  updateDisplayCurrency(displayCurrency: CurrencyCode) {
+    const user = this._user();
+    const token = this._token();
+    if (!user || !token) return;
+
+    const updatedUser = { ...user, display_currency: displayCurrency };
+    this._user.set(updatedUser);
+    this.saveToStorage(token, updatedUser);
   }
 }

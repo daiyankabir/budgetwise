@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal, ViewChild } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl } from '@angular/forms';
 import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
@@ -9,6 +10,8 @@ import { merge, Observable } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 import { Transaction, Category, TransactionQueryParams } from '../../models/models';
 import { TransactionDialogComponent } from '../../components/transaction-dialog/transaction-dialog.component';
+import { CurrencyService } from '../../services/currency.service';
+import { formatCurrency as formatCurrencyValue, formatExchangeRate } from '../../utils/currency.util';
 
 @Component({
   selector: 'app-transactions',
@@ -112,8 +115,11 @@ import { TransactionDialogComponent } from '../../components/transaction-dialog/
               <th mat-header-cell *matHeaderCellDef mat-sort-header class="amount-col">Amount</th>
               <td mat-cell *matCellDef="let t" class="amount-col">
                 <span [class]="t.type === 'income' ? 'amount-positive' : 'amount-negative'">
-                  {{ t.type === 'income' ? '+' : '-' }}{{ formatCurrency(t.amount) }}
+                  {{ t.type === 'income' ? '+' : '-' }}{{ formatCurrency(t.displayAmount ?? t.amount, currencyService.displayCurrency()) }}
                 </span>
+                <small class="conversion-note" *ngIf="t.currency !== currencyService.displayCurrency()">
+                  1 {{ t.currency }} = {{ formatExchangeRate(t.conversionRate ?? 1) }} {{ currencyService.displayCurrency() }}
+                </small>
               </td>
             </ng-container>
 
@@ -167,6 +173,13 @@ import { TransactionDialogComponent } from '../../components/transaction-dialog/
       white-space: nowrap;
     }
 
+    .conversion-note {
+      display: block;
+      margin-top: 2px;
+      color: #64748b;
+      font-size: 0.7rem;
+    }
+
     .category-badge {
       display: inline-flex;
       align-items: center;
@@ -196,6 +209,9 @@ export class TransactionsComponent implements OnInit {
   private api = inject(ApiService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
+  private destroyRef = inject(DestroyRef);
+  public currencyService = inject(CurrencyService);
+  readonly formatExchangeRate = formatExchangeRate;
 
   displayedColumns = ['date', 'category', 'type', 'description', 'amount', 'actions'];
   transactions = signal<Transaction[]>([]);
@@ -215,6 +231,9 @@ export class TransactionsComponent implements OnInit {
   endDateControl = new FormControl('');
 
   ngOnInit() {
+    this.currencyService.currencyChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.loadTransactions());
     this.loadCategories();
     this.setupFilters();
     this.loadTransactions();
@@ -272,9 +291,9 @@ export class TransactionsComponent implements OnInit {
         this.totalItems.set(res.pagination.total);
         this.loading.set(false);
       },
-      error: () => {
+      error: (error) => {
         this.loading.set(false);
-        this.snackBar.open('Failed to load transactions', 'Close', { duration: 3000 });
+        this.snackBar.open(error?.error?.error || 'Failed to load transactions', 'Close', { duration: 4000 });
       },
     });
   }
@@ -314,7 +333,11 @@ export class TransactionsComponent implements OnInit {
         const dialogRef = this.dialog.open(TransactionDialogComponent, {
           width: '500px',
           maxWidth: '90vw',
-          data: { transaction, categories: res.categories },
+          data: {
+            transaction,
+            categories: res.categories,
+            displayCurrency: this.currencyService.displayCurrency(),
+          },
         });
 
         dialogRef.afterClosed().subscribe((result) => {
@@ -340,12 +363,8 @@ export class TransactionsComponent implements OnInit {
     }
   }
 
-  formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
+  formatCurrency(amount: number, currency = this.currencyService.displayCurrency()): string {
+    return formatCurrencyValue(amount, currency);
   }
 
   formatDate(dateStr: string): string {

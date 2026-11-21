@@ -72,6 +72,10 @@ export function initializeDatabase(): Database.Database {
     )
   `);
 
+  addColumnIfMissing('users', 'display_currency', "TEXT NOT NULL DEFAULT 'EUR'");
+  addColumnIfMissing('transactions', 'currency', "TEXT NOT NULL DEFAULT 'USD'");
+  addColumnIfMissing('budgets', 'currency', "TEXT NOT NULL DEFAULT 'USD'");
+
   // Create indexes for better query performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC);
@@ -84,6 +88,13 @@ export function initializeDatabase(): Database.Database {
 
   console.log('Database initialized successfully');
   return db;
+}
+
+function addColumnIfMissing(table: string, column: string, definition: string) {
+  const columns = db.pragma(`table_info(${table})`) as Array<{ name: string }>;
+  if (!columns.some((entry) => entry.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 function seedDefaultCategories() {
